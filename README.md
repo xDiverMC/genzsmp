@@ -1,0 +1,2 @@
+# genzsmp
+website minecraft genzsmp
