@@ -468,18 +468,19 @@
       ];
 
       const BANS = [
-        { title: "Cheat & Client Ilegal", description: "Menggunakan client modifikasi ilegal untuk mendapatkan keuntungan kompetitif (Killaura, fly, speed hack, ESP, dll).", severity: "Permanent" },
-        { title: "X-Ray Mod / Texture", description: "Menggunakan texture pack transparan atau mod X-Ray untuk melacak diamond, netherite, atau mineral berharga dengan instan.", severity: "Permanent" },
-        { title: "Fly Hack & Speed", description: "Bypass batasan gravitasi server untuk terbang atau berlari secepat kilat menggunakan script eksternal.", severity: "Permanent" },
-        { title: "Duplication Glitch", description: "Melakukan duplikasi item (dupe) dengan metode bug piston, donkey, chunk loading, atau bug shulker box.", severity: "Permanent" },
-        { title: "Exploit & Crash Server", description: "Sengaja membuat mesin lag (redstone clock ilegal, lag machine) atau berupaya membuat server crash secara paksa.", severity: "Critical" },
-        { title: "Griefing & Pencurian", description: "Merusak bangunan player lain di area yang belum di-claim atau mencuri barang berharga dari chest player lain.", severity: "High" },
-        { title: "Scam & Penipuan", description: "Menipu pemain lain dalam transaksi jual beli (misal: berjanji mentransfer uang tapi membawa kabur item).", severity: "High" },
-        { title: "Macro & Botting", description: "Menggunakan macro script atau bot pihak ketiga untuk melakukan farming otomatis selagi AFK agar tidak terdeteksi AFK kicker.", severity: "High" },
-        { title: "Auto Clicker Ilegal", description: "Menggunakan aplikasi klik otomatis berkecepatan tinggi (>20 CPS) di pvp arena untuk memojokkan musuh tanpa jeda hit.", severity: "High" },
-        { title: "DDoS & Teror Jaringan", description: "Melakukan ancaman penyerangan server, penyebaran IP Address staff, atau ancaman DDoS terhadap layanan Genz SMP.", severity: "Permanent" },
-        { title: "Jual Beli Ilegal (RMT)", description: "Melakukan transaksi mata uang server, item server, atau akun menggunakan uang asli di luar toko resmi server (Real Money Trading).", severity: "Permanent" },
-        { title: "Impersonate Staff", description: "Mengaku-ngaku sebagai Admin, Mod, atau Owner untuk menipu pemain lain, memeras item, atau mengancam banned palsu.", severity: "Permanent" }
+        { title: "Scam Player", description: "Menipu atau melakukan scam terhadap pemain lain dalam transaksi apapun.", severity: "Ban 3 Hari" },
+        { title: "Rusuh ke Pemain Tak Bersalah", description: "Mengganggu atau berbuat onar terhadap pemain yang tidak bersalah.", severity: "Ban 3 Hari" },
+        { title: "Rusuh Base Orang Lain", description: "Merusak atau mengacak-ngacak base/bangunan milik pemain lain.", severity: "Ban 3 Hari" },
+        { title: "Rusuh / Grief Server", description: "Merusak fasilitas atau area milik server (grief) secara sengaja.", severity: "Ban IP" },
+        { title: "Cheating", description: "Menggunakan cheat, hack client, atau modifikasi ilegal apapun.", severity: "Ban 3 Hari" },
+        { title: "Ganggu Player Baru", description: "Mengganggu atau merugikan pemain baru yang belum berpengalaman.", severity: "Ban 1 Hari" },
+        { title: "Toxic di Server", description: "Bersikap toxic, kasar, atau provokatif di chat server.", severity: "Mute 4 Jam" },
+        { title: "Sering Toxic (Berulang)", description: "Melakukan sikap toxic secara berulang setelah sebelumnya sudah ditegur.", severity: "Mute 12 Jam" },
+        { title: "Bahas Konten 18+", description: "Membahas atau menyebarkan konten dewasa (18+) di chat server.", severity: "Mute 6 Jam" },
+        { title: "Punya Rank Tapi Rusuh ke Member", description: "Memiliki rank donatur namun tetap berbuat rusuh terhadap player rank member.", severity: "Ban 3 Hari" },
+        { title: "Memanfaatkan Bug", description: "Sengaja memanfaatkan bug/glitch server untuk keuntungan pribadi.", severity: "Ban 1 Hari" },
+        { title: "Scam Arqoah", description: "Melakukan scam terkait transaksi Arqoah.", severity: "Ban 1 Hari" },
+        { title: "Kill Player", description: "Membunuh pemain lain di luar ketentuan yang diperbolehkan.", severity: "Ban 3 Hari" }
       ];
 
       // =======================================================
@@ -1031,7 +1032,7 @@
         const filteredBans = BANS.filter((ban) => {
           const matchesQuery = ban.title.toLowerCase().includes(banQuery.toLowerCase()) || 
                                ban.description.toLowerCase().includes(banQuery.toLowerCase());
-          const matchesFilter = banFilter === "All" || ban.severity === banFilter;
+          const matchesFilter = banFilter === "All" || ban.severity.includes(banFilter);
           return matchesQuery && matchesFilter;
         });
 
@@ -1859,7 +1860,7 @@
                   </h2>
                   <div className="mt-3 h-1 w-20 bg-red-600 mx-auto rounded-full" />
                   <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
-                    Tindakan di bawah ini dilarang keras! Pelanggaran akan dikenai sanksi tegas mulai dari Mute, Kick, hingga Banned Permanent dari jaringan Genz SMP.
+                    Tindakan di bawah ini dilarang keras! Pelanggaran akan dikenai sanksi tegas mulai dari Mute Chat, Ban Sementara, hingga Ban IP dari jaringan Genz SMP.
                   </p>
                 </div>
 
@@ -1879,7 +1880,7 @@
                   </div>
 
                   <div className="flex gap-2">
-                    {["All", "Permanent", "Critical", "High"].map((sev) => (
+                    {["All", "Ban IP", "Ban 3 Hari", "Ban 1 Hari", "Mute"].map((sev) => (
                       <button
                         key={sev}
                         onClick={() => setBanFilter(sev)}
@@ -1906,9 +1907,9 @@
                         <div className="flex items-center justify-between gap-4 mb-4">
                           <h3 className="font-display font-bold text-base text-white">{ban.title}</h3>
                           <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                            ban.severity === "Permanent"
+                            ban.severity.includes("IP")
                               ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : ban.severity === "Critical"
+                              : ban.severity.includes("Ban")
                               ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
                               : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
                           }`}>
