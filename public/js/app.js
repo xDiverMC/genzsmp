@@ -1,0 +1,1623 @@
+const { useState, useEffect, useRef } = React;
+const DATA = window.LARAVEL_SERVER_DATA;
+
+const SERVER_INFO = {
+  name: DATA.serverInfo.name,
+  suffix: DATA.serverInfo.suffix,
+  tagline: DATA.serverInfo.tagline,
+  ip: DATA.serverInfo.public_ip,
+  port: String(DATA.serverInfo.bedrock_port),
+  javaVersion: DATA.serverInfo.java_version,
+  bedrockVersion: DATA.serverInfo.bedrock_version,
+  supportType: DATA.serverInfo.support_type,
+  discordUrl: DATA.serverInfo.discord_url,
+  whatsappGroupUrl: DATA.serverInfo.whatsapp_group_url,
+  whatsappUrl: DATA.serverInfo.whatsapp_owner,
+  youtubeUrl: DATA.serverInfo.youtube_url,
+  tiktokUrl: DATA.serverInfo.tiktok_url,
+  instagramUrl: DATA.serverInfo.instagram_url,
+  admin1: DATA.admins.admin1,
+  admin2: DATA.admins.admin2
+};
+
+const IMAGES = DATA.images;
+const FEATURES = DATA.features;
+const RANKS = DATA.ranks;
+const MONEY_PACKAGES = DATA.moneyPackages;
+const SKILL_PACKAGES = DATA.skillPackages;
+const ALL_CHECKOUT_ITEMS = DATA.allCheckoutItems;
+const SKILLS = DATA.skillsInfo;
+const VOTE_LINKS = DATA.voteLinks;
+const RULES = DATA.rules;
+const BANS = DATA.bans;
+
+const GALLERY_ITEMS = [
+  { id: "img1", title: "", image: IMAGES.townImg, category: "Galery" },
+  { id: "img2", title: "", image: IMAGES.dungeonImg, category: "Galery" },
+  { id: "img3", title: "", image: IMAGES.pvpImg, category: "Galery" },
+  { id: "img4", title: "", image: IMAGES.heroBg, category: "Galery" }
+];
+
+// =======================================================
+//   REUSABLE ICON COMPONENT
+// =======================================================
+const Icon = ({ name, className = "h-5 w-5" }) => {
+  const kebabName = name
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current && window.lucide) {
+      ref.current.innerHTML = '';
+      const iconEl = document.createElement('i');
+      iconEl.setAttribute('data-lucide', kebabName);
+      ref.current.appendChild(iconEl);
+      window.lucide.createIcons({
+        node: ref.current,
+        attrs: { class: className }
+      });
+    }
+  }, [kebabName, className]);
+
+  return <span ref={ref} className="inline-flex items-center justify-center shrink-0" />;
+};
+
+// =======================================================
+//   MODAL COMPONENT
+// =======================================================
+const DetailModal = ({ isOpen, onClose, title, type, colorClass, subtitle, description, listItems, cooldown, onCheckout }) => {
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    if (isOpen) {
+      window.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300" onClick={onClose} />
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-purple-500/20 bg-neutral-950 p-6 shadow-2xl md:p-8 z-10 animate-fade-in-up">
+        <div className={`absolute -top-24 -left-24 h-48 w-48 rounded-full bg-gradient-to-br ${colorClass || 'from-primary to-purple-600'} opacity-15 blur-3xl`} />
+        <div className="absolute -right-24 -bottom-24 h-48 w-48 rounded-full bg-purple-600 opacity-10 blur-3xl" />
+
+        <div className="relative z-10 flex items-start justify-between">
+          <div>
+            <span className={`inline-block rounded-full bg-gradient-to-r ${colorClass || 'from-primary to-purple-600'} px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white`}>
+              {type} Detail
+            </span>
+            <h3 className="mt-2 font-display text-2xl font-bold tracking-tight text-white">{title}</h3>
+            {subtitle && <p className="mt-1 text-sm text-primary font-medium">{subtitle}</p>}
+          </div>
+          <button onClick={onClose} className="rounded-full border border-neutral-800 bg-neutral-900/80 p-2 text-neutral-400 hover:border-purple-500 hover:text-white transition-colors cursor-pointer">
+            <Icon name="X" className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="relative z-10 mt-6 space-y-4">
+          {description && <p className="text-sm leading-relaxed text-neutral-300">{description}</p>}
+          {cooldown && (
+            <div className="flex items-center gap-2 rounded-lg bg-purple-500/10 px-3 py-2 text-xs text-primary border border-purple-500/10">
+              <Icon name="Clock" className="h-4 w-4" />
+              <span>Cooldown: <strong className="text-white">{cooldown}</strong></span>
+            </div>
+          )}
+          {listItems && listItems.length > 0 && (
+            <div>
+              <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Keuntungan & Fitur:</h4>
+              <ul className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                {listItems.map((item, index) => (
+                  <li key={index} className="flex items-start gap-3 rounded-lg bg-neutral-900/40 p-2.5 border border-neutral-800/40">
+                    <div className={`mt-0.5 rounded-full bg-gradient-to-br ${colorClass || 'from-primary to-purple-600'} p-0.5 text-white`}>
+                      <Icon name="Check" className="h-3 w-3" />
+                    </div>
+                    <span className="text-sm text-neutral-200">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="relative z-10 mt-8 flex flex-col sm:flex-row justify-end gap-3">
+          {type === "rank" && (
+            <button 
+              onClick={() => {
+                onClose();
+                onCheckout({ name: title, price: subtitle });
+              }} 
+              className="w-full sm:w-auto rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-2.5 text-center text-sm font-bold text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+            >
+              <Icon name="ShoppingBag" className="h-4 w-4" /> Beli / Checkout
+            </button>
+          )}
+          <button onClick={onClose} className="w-full sm:w-auto rounded-xl bg-neutral-900 border border-neutral-800 hover:border-purple-500/30 px-6 py-2.5 text-center text-sm font-semibold text-neutral-300 hover:text-white transition-all cursor-pointer">
+            Tutup Detail
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =======================================================
+//   CHECKOUT MODAL COMPONENT (INTEGRATED WITH BACKEND)
+// =======================================================
+const CheckoutModal = ({ isOpen, onClose, selectedItem, itemsList }) => {
+  const [gamertag, setGamertag] = useState("");
+  const [edition, setEdition] = useState("Java");
+  const [payment, setPayment] = useState("QRIS");
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}-${month}-${year}`;
+  });
+
+  const [activeType, setActiveType] = useState("");
+  const [activePrice, setActivePrice] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [copiedFormat, setCopiedFormat] = useState(false);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      if (selectedItem) {
+        setActiveType(selectedItem.name);
+        setActivePrice(selectedItem.price);
+      } else if (itemsList && itemsList.length > 0) {
+        setActiveType(itemsList[0].name);
+        setActivePrice(itemsList[0].price);
+      }
+      setGamertag("");
+      setEdition("Java");
+      setPayment("QRIS");
+      setIsSuccess(false);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, selectedItem, itemsList]);
+
+  if (!isOpen) return null;
+
+  const handleTypeChange = (typeName) => {
+    setActiveType(typeName);
+    const found = itemsList.find(item => item.name === typeName);
+    if (found) {
+      setActivePrice(found.price);
+    }
+  };
+
+  const formatMessage = () => {
+    return `Halo, saya mau beli:\n\nTipe : ${activeType}\nTanggal : ${date}\nGamertag : ${gamertag}\nJava/Bedrock : ${edition}\nHarga : ${activePrice}\nPembayaran : ${payment}`;
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(formatMessage());
+    setCopiedFormat(true);
+    setTimeout(() => setCopiedFormat(false), 2000);
+  };
+
+  const handleWhatsApp = () => {
+    if (whatsappUrl) {
+      window.open(whatsappUrl, '_blank');
+    } else {
+      const encodedText = encodeURIComponent(formatMessage());
+      const url = `https://api.whatsapp.com/send?phone=6283132172199&text=${encodedText}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!gamertag.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/checkout/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': DATA.csrfToken
+        },
+        body: JSON.stringify({
+          gamertag: gamertag.trim(),
+          item_name: activeType,
+          edition: edition,
+          price: activePrice,
+          payment_method: payment,
+          date: date
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setWhatsappUrl(result.data.whatsapp_url);
+        setIsSuccess(true);
+      } else {
+        setIsSuccess(true);
+      }
+    } catch (err) {
+      console.error("Order submission error:", err);
+      setIsSuccess(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-md transition-opacity duration-300" onClick={onClose} />
+
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-purple-500/20 bg-neutral-950 p-6 shadow-2xl md:p-8 z-10 animate-fade-in-up">
+        <div className="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-gradient-to-br from-primary to-purple-600 opacity-15 blur-3xl" />
+        <div className="absolute -right-24 -bottom-24 h-48 w-48 rounded-full bg-purple-600 opacity-10 blur-3xl" />
+
+        <div className="relative z-10 flex items-start justify-between mb-6">
+          <div>
+            <span className="inline-block rounded-full bg-purple-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary border border-purple-500/20">
+              Sistem Checkout
+            </span>
+            <h3 className="mt-2 font-display text-2xl font-bold tracking-tight text-white">Form Pembelian</h3>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-neutral-800 bg-neutral-900/80 p-2 text-neutral-400 hover:border-purple-500 hover:text-white transition-colors cursor-pointer">
+            <Icon name="X" className="h-5 w-5" />
+          </button>
+        </div>
+
+        {!isSuccess ? (
+          <form onSubmit={handleSubmit} className="relative z-10 space-y-4">
+            {/* TIPE */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Tipe Rank / Paket</label>
+              <select
+                value={activeType}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                className="w-full rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary/50 focus:outline-none px-4 py-3 text-sm text-white"
+              >
+                {itemsList.map((item, idx) => (
+                  <option key={idx} value={item.name}>{item.name} - {item.price}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* TANGGAL */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Tanggal Pembelian</label>
+              <input
+                type="text"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="DD-MM-YYYY"
+                className="w-full rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary/50 focus:outline-none px-4 py-3 text-sm text-white"
+              />
+            </div>
+
+            {/* GAMERTAG */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Gamertag (Username Minecraft)</label>
+              <input
+                type="text"
+                value={gamertag}
+                onChange={(e) => setGamertag(e.target.value)}
+                placeholder="Contoh: SteveGenz"
+                required
+                className="w-full rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary/50 focus:outline-none px-4 py-3 text-sm text-white placeholder-neutral-600"
+              />
+            </div>
+
+            {/* JAVA / BEDROCK */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Edisi Game</label>
+              <div className="grid grid-cols-3 gap-2">
+                {["Java", "Bedrock", "Java & Bedrock"].map((ed) => (
+                  <button
+                    key={ed}
+                    type="button"
+                    onClick={() => setEdition(ed)}
+                    className={`rounded-xl py-3 text-xs font-bold transition-all border ${
+                      edition === ed
+                        ? "bg-primary/10 text-primary border-primary/40"
+                        : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:text-white"
+                    }`}
+                  >
+                    {ed}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* HARGA (READ-ONLY) */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Harga Total</label>
+              <div className="w-full rounded-xl bg-neutral-900/40 border border-neutral-800/60 px-4 py-3 text-sm font-bold text-primary">
+                {activePrice}
+              </div>
+            </div>
+
+            {/* PEMBAYARAN */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Metode Pembayaran</label>
+              <select
+                value={payment}
+                onChange={(e) => setPayment(e.target.value)}
+                className="w-full rounded-xl bg-neutral-900 border border-neutral-800 focus:border-primary/50 focus:outline-none px-4 py-3 text-sm text-white"
+              >
+                <option value="QRIS">QRIS (Otomatis & Semua E-Wallet)</option>
+                <option value="DANA">DANA</option>
+                <option value="GoPay">GoPay</option>
+                <option value="OVO">OVO</option>
+                <option value="ShopeePay">ShopeePay</option>
+                <option value="Bank Transfer">Bank Transfer (BCA/Mandiri/BRI)</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-xl bg-gradient-to-r from-primary to-purple-600 py-3.5 text-center text-sm font-bold uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-purple-500/20 cursor-pointer mt-2 disabled:opacity-50"
+            >
+              {isSubmitting ? "Memproses..." : "Lanjutkan ke Checkout"}
+            </button>
+          </form>
+        ) : (
+          <div className="relative z-10 space-y-6 text-center py-4 animate-fade-in-up">
+            <div className="mx-auto h-16 w-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-4">
+              <Icon name="Check" className="h-8 w-8" />
+            </div>
+
+            <div>
+              <h4 className="font-display text-xl font-bold text-white mb-1">Pesanan Anda Siap!</h4>
+              <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+                Silakan kirimkan format pembelian di bawah ini ke WhatsApp Owner/Admin kami untuk menyelesaikan transaksi & aktivasi instan rank/paket Anda di server Genz SMP.
+              </p>
+            </div>
+
+            {/* RENDER REQUESTED FORMAT */}
+            <div className="text-left rounded-xl bg-neutral-900/80 border border-neutral-800 p-4 font-mono text-xs leading-relaxed text-neutral-300 relative group">
+              <button 
+                onClick={handleCopy}
+                className="absolute top-3 right-3 rounded-lg bg-neutral-950 border border-neutral-800 hover:border-primary hover:text-white p-1.5 text-neutral-400 transition-colors cursor-pointer"
+                title="Salin Format"
+              >
+                {copiedFormat ? <Icon name="Check" className="h-3.5 w-3.5 text-emerald-400" /> : <Icon name="Copy" className="h-3.5 w-3.5" />}
+              </button>
+
+              <div className="whitespace-pre-wrap select-all">
+                {formatMessage()}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button
+                onClick={handleCopy}
+                className="flex-1 rounded-xl bg-neutral-900 border border-neutral-800 py-3 text-center text-xs font-bold uppercase tracking-wider text-neutral-300 hover:text-white hover:border-purple-500/30 transition-all active:scale-95 cursor-pointer"
+              >
+                {copiedFormat ? "Berhasil Disalin!" : "Salin Format"}
+              </button>
+              <button
+                onClick={handleWhatsApp}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-3 text-center text-xs font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+              >
+                <Icon name="MessageSquare" className="h-4 w-4 fill-white text-white" /> Kirim WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// =======================================================
+//   LIGHTBOX COMPONENT
+// =======================================================
+const Lightbox = ({ isOpen, onClose, items, currentIndex, onNavigate }) => {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "ArrowRight") handleNext();
+    };
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen, currentIndex, onClose]);
+
+  const handlePrev = () => {
+    const prevIndex = (currentIndex - 1 + items.length) % items.length;
+    onNavigate(prevIndex);
+  };
+
+  const handleNext = () => {
+    const nextIndex = (currentIndex + 1) % items.length;
+    onNavigate(nextIndex);
+  };
+
+  if (!isOpen || items.length === 0) return null;
+
+  const currentItem = items[currentIndex];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 md:p-8">
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-end bg-gradient-to-b from-black/80 to-transparent p-4 md:p-6">
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-xs text-neutral-500">{currentIndex + 1} / {items.length}</span>
+          <button onClick={onClose} className="rounded-full bg-neutral-900/80 p-2 text-neutral-400 border border-neutral-800 hover:border-primary hover:text-white transition-colors cursor-pointer">
+            <Icon name="X" className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex h-full w-full max-w-5xl items-center justify-center">
+        <button onClick={handlePrev} className="absolute left-2 md:-left-16 z-20 rounded-full bg-neutral-900/60 p-3 text-neutral-400 border border-neutral-800/40 hover:border-primary hover:text-white hover:bg-neutral-900 transition-all cursor-pointer">
+          <Icon name="ChevronLeft" className="h-6 w-6" />
+        </button>
+
+        <div className="relative max-h-[75vh] max-w-full overflow-hidden rounded-xl border border-neutral-800 shadow-2xl">
+          <img src={currentItem.image} alt="" referrerPolicy="no-referrer" className="max-h-[75vh] w-auto max-w-full object-contain" />
+        </div>
+
+        <button onClick={handleNext} className="absolute right-2 md:-right-16 z-20 rounded-full bg-neutral-900/60 p-3 text-neutral-400 border border-neutral-800/40 hover:border-primary hover:text-white hover:bg-neutral-900 transition-all cursor-pointer">
+          <Icon name="ChevronRight" className="h-6 w-6" />
+        </button>
+      </div>
+
+      <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black/80 to-transparent p-6 text-center">
+        <p className="text-xs text-neutral-500">Gunakan panah atau ESC untuk navigasi.</p>
+      </div>
+    </div>
+  );
+};
+
+// =======================================================
+//   MAIN APP COMPONENT
+// =======================================================
+const App = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // REAL-TIME PLAYER COUNT STATE FROM LARAVEL SERVER
+  const [onlinePlayers, setOnlinePlayers] = useState(DATA.initialStatus?.players?.online ?? 0);
+  const [playerCountStatus, setPlayerCountStatus] = useState(DATA.initialStatus?.online ? "online" : "loading");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPlayerCount = async () => {
+      try {
+        const res = await fetch('/api/server/status');
+        const json = await res.json();
+
+        if (isMounted && json.success && json.data) {
+          setOnlinePlayers(json.data.players.online);
+          setPlayerCountStatus(json.data.online ? "online" : "online");
+        }
+      } catch (err) {
+        console.error("Gagal mengambil data player online:", err);
+        if (isMounted) {
+          setPlayerCountStatus("online");
+        }
+      }
+    };
+
+    fetchPlayerCount();
+    const interval = setInterval(fetchPlayerCount, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Copy actions
+  const [copiedIp, setCopiedIp] = useState(false);
+  const [copiedPort, setCopiedPort] = useState(false);
+  const [copiedBoth, setCopiedBoth] = useState(false);
+
+  const handleCopyIp = () => {
+    navigator.clipboard.writeText(SERVER_INFO.ip);
+    setCopiedIp(true);
+    setTimeout(() => setCopiedIp(false), 2000);
+  };
+
+  const handleCopyPort = () => {
+    navigator.clipboard.writeText(SERVER_INFO.port);
+    setCopiedPort(true);
+    setTimeout(() => setCopiedPort(false), 2000);
+  };
+
+  const handleCopyIpAndPort = () => {
+    navigator.clipboard.writeText(`IP: ${SERVER_INFO.ip}\nPort: ${SERVER_INFO.port}`);
+    setCopiedBoth(true);
+    setTimeout(() => setCopiedBoth(false), 2000);
+  };
+
+  // Tab selection states
+  const [activeTab, setActiveTab] = useState("ranks");
+
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState({ title: "", type: "rank" });
+
+  const openDetailModal = (title, type, colorClass, subtitle, description, listItems, cooldown) => {
+    setModalData({ title, type, colorClass, subtitle, description, listItems, cooldown });
+    setIsModalOpen(true);
+  };
+
+  // Checkout states
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutItem, setCheckoutItem] = useState(null);
+
+  const openCheckoutModal = (item) => {
+    setCheckoutItem(item);
+    setIsCheckoutOpen(true);
+  };
+
+  // Lightbox states
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const openLightbox = (index) => {
+    setLightboxIndex(index);
+    setIsLightboxOpen(true);
+  };
+
+  // Back to top
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 500);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Ban List search and filter
+  const [banQuery, setBanQuery] = useState("");
+  const [banFilter, setBanFilter] = useState("All");
+
+  const filteredBans = BANS.filter((ban) => {
+    const matchesQuery = ban.title.toLowerCase().includes(banQuery.toLowerCase()) || 
+                         ban.description.toLowerCase().includes(banQuery.toLowerCase());
+    const matchesFilter = banFilter === "All" || ban.severity.includes(banFilter);
+    return matchesQuery && matchesFilter;
+  });
+
+  const navLinks = [
+    { id: "hero", label: "Home" },
+    { id: "portal", label: "Portal" },
+    { id: "bergabung", label: "Cara Gabung" },
+    { id: "hubungi-admin", label: "Hubungi Admin" },
+    { id: "fitur", label: "Fitur" },
+    { id: "rank-money", label: "Store" },
+    { id: "gallery", label: "Gallery" },
+    { id: "vote", label: "Vote" },
+    { id: "aturan", label: "Aturan" }
+  ];
+
+  return (
+    <div className="relative min-h-screen bg-[#0f0f0f] font-sans text-neutral-200 overflow-x-hidden selection:bg-primary selection:text-white">
+
+      {/* Glowing ambient blobs */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute top-[15%] left-[-10%] h-[500px] w-[500px] rounded-full bg-purple-600/5 blur-[120px]" />
+        <div className="absolute bottom-[20%] right-[-10%] h-[500px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
+      </div>
+
+      {/* STICKY NAVBAR */}
+      <nav className="glass-nav fixed top-0 left-0 right-0 z-40 transition-all duration-300">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-20 items-center justify-between">
+
+            {/* Logo */}
+            <a href="#hero" className="flex items-center gap-3 group focus:outline-none">
+              <img 
+                src={IMAGES.logoImg} 
+                alt="Logo" 
+                referrerPolicy="no-referrer"
+                className="h-10 w-10 rounded-xl border border-purple-500/30 object-cover shadow-lg group-hover:scale-105 transition-transform"
+              />
+              <span className="font-display text-xl font-black tracking-wider uppercase text-white">
+                {SERVER_INFO.name}<span className="text-primary">{SERVER_INFO.suffix}</span>
+              </span>
+            </a>
+
+            {/* Desktop Nav */}
+            <div className="hidden md:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={`#${link.id}`}
+                  className="rounded-lg px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-900/60 transition-all"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+
+            {/* Discord & WhatsApp Group CTA */}
+            <div className="hidden lg:flex items-center gap-2">
+              <a
+                href={SERVER_INFO.discordUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary border border-purple-500/30 transition-all active:scale-95"
+              >
+                <Icon name="MessageSquare" className="h-4 w-4 fill-primary" /> Join Discord
+              </a>
+              <a
+                href={SERVER_INFO.whatsappGroupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 transition-all active:scale-95"
+              >
+                <Icon name="Phone" className="h-4 w-4" /> Grup WhatsApp
+              </a>
+            </div>
+
+            {/* Mobile Nav Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="rounded-lg p-2.5 text-neutral-400 hover:bg-neutral-900 hover:text-white md:hidden cursor-pointer"
+            >
+              <Icon name={isMobileMenuOpen ? "X" : "Menu"} className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="bg-[#0c0c0c]/95 border-b border-neutral-900 md:hidden animate-fade-in-up">
+            <div className="space-y-1 px-4 py-4">
+              {navLinks.map((link) => (
+                <a
+                  key={link.id}
+                  href={`#${link.id}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block rounded-lg px-4 py-3 text-sm font-semibold uppercase text-neutral-300 hover:bg-neutral-900 hover:text-white"
+                >
+                  {link.label}
+                </a>
+              ))}
+              <div className="pt-4 border-t border-neutral-900 space-y-2">
+                <a
+                  href={SERVER_INFO.discordUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 text-center text-xs font-bold uppercase tracking-wider text-white"
+                >
+                  <Icon name="MessageSquare" className="h-4 w-4 fill-white" /> Join Discord
+                </a>
+                <a
+                  href={SERVER_INFO.whatsappGroupUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-center text-xs font-bold uppercase tracking-wider text-white"
+                >
+                  <Icon name="Phone" className="h-4 w-4" /> Grup WhatsApp
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* HERO SECTION */}
+      <header id="hero" className="relative flex min-h-screen items-center justify-center px-4 pt-20 overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.15] scale-105 pointer-events-none"
+          style={{ backgroundImage: `url(${IMAGES.heroBg})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-transparent to-transparent pointer-events-none" />
+
+        <div className="relative z-10 mx-auto max-w-4xl text-center">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-purple-500/10 px-4 py-1.5 text-xs font-bold text-primary border border-purple-500/20 tracking-wider uppercase animate-pulse">
+            <span className="h-2.5 w-2.5 rounded-full bg-purple-400" />
+            Minecraft Indonesia Server
+          </div>
+
+          <h1 className="font-display text-5xl font-black tracking-tight text-white uppercase sm:text-7xl md:text-8xl leading-tight">
+            {SERVER_INFO.name}<span className="text-primary text-glow">{SERVER_INFO.suffix}</span>
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-sm leading-relaxed text-neutral-400 sm:text-lg md:text-xl">
+            {SERVER_INFO.tagline}
+          </p>
+
+          {/* Player online counter (REAL-TIME VIA LARAVEL API) */}
+          <div className="mt-8 flex justify-center">
+            <div className="flex items-center gap-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/80 px-6 py-3 shadow-lg backdrop-blur-sm">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+              </span>
+              <p className="text-xs font-bold tracking-wider uppercase text-neutral-300">
+                <strong className="text-white text-base font-mono">{onlinePlayers}</strong> Pemain Sedang Online
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4 px-4">
+            <a
+              href="#bergabung"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary to-purple-600 px-8 py-5 text-sm font-black uppercase tracking-wider text-white shadow-xl shadow-purple-500/10 hover:brightness-110 active:scale-95 transition-all"
+            >
+              Mulai Petualangan <Icon name="Sword" className="h-5 w-5" />
+            </a>
+            <a
+              href="#portal"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-purple-500/30 px-8 py-5 text-sm font-black uppercase tracking-wider text-white transition-all active:scale-95"
+            >
+              Portal Koneksi <Icon name="Server" className="h-5 w-5" />
+            </a>
+          </div>
+        </div>
+      </header>
+
+      {/* PORTAL KONEKSI */}
+      <section id="portal" className="py-24 px-4 relative scroll-mt-10">
+        <div className="mx-auto max-w-4xl">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Koneksi Server</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Portal Koneksi
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+          </div>
+
+          <div className="glass-card rounded-3xl p-6 md:p-10 border border-purple-500/10 relative overflow-hidden group shadow-2xl">
+            <div className="absolute top-0 left-0 h-64 w-64 rounded-full bg-purple-600/10 blur-3xl group-hover:bg-purple-600/15 transition-colors pointer-events-none" />
+            <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-primary/10 blur-3xl group-hover:bg-primary/15 transition-colors pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10">
+
+              {/* Left: Logo */}
+              <div className="flex flex-col items-center justify-center shrink-0 w-full md:w-auto">
+                <div className="relative group/logo">
+                  <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-primary to-purple-500 opacity-60 blur-md group-hover/logo:opacity-90 transition duration-500" />
+                  <img
+                    src={IMAGES.logoImg}
+                    alt="Logo"
+                    referrerPolicy="no-referrer"
+                    className="relative h-44 w-44 md:h-52 md:w-52 rounded-3xl border border-purple-500/30 object-cover shadow-2xl transition duration-500 group-hover/logo:scale-[1.02]"
+                  />
+                </div>
+                <div className="mt-4 text-center hidden md:block">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-3.5 py-1 text-xs font-semibold text-primary border border-purple-500/20">
+                    <span className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
+                    Server Online
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Server Rows */}
+              <div className="flex-1 w-full space-y-3">
+
+                {/* Row 1: SERVER IP */}
+                <div 
+                  onClick={handleCopyIp}
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-purple-500/40 px-5 py-3.5 transition-all duration-200 cursor-pointer group/row"
+                >
+                  <span className="font-display font-black text-xs uppercase tracking-wider text-neutral-400">SERVER IP</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm md:text-base font-bold text-white selection:bg-transparent">{SERVER_INFO.ip}</span>
+                    <div className="rounded-lg p-1.5 bg-neutral-950 border border-neutral-800 group-hover/row:border-purple-500/30 transition-colors text-neutral-400 group-hover/row:text-primary">
+                      {copiedIp ? <Icon name="Check" className="h-4 w-4 text-emerald-400" /> : <Icon name="Copy" className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: PORT */}
+                <div 
+                  onClick={handleCopyPort}
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800 hover:border-purple-500/40 px-5 py-3.5 transition-all duration-200 cursor-pointer group/row"
+                >
+                  <span className="font-display font-black text-xs uppercase tracking-wider text-neutral-400">PORT</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm md:text-base font-bold text-white selection:bg-transparent">{SERVER_INFO.port}</span>
+                    <div className="rounded-lg p-1.5 bg-neutral-950 border border-neutral-800 group-hover/row:border-purple-500/30 transition-colors text-neutral-400 group-hover/row:text-primary">
+                      {copiedPort ? <Icon name="Check" className="h-4 w-4 text-emerald-400" /> : <Icon name="Copy" className="h-4 w-4" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: VERSI BEDROCK */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-neutral-900/40 border border-neutral-900/60 px-5 py-3.5">
+                  <span className="font-display font-black text-xs uppercase tracking-wider text-neutral-400">VERSI BEDROCK</span>
+                  <span className="font-mono text-sm font-semibold text-neutral-200">{SERVER_INFO.bedrockVersion}</span>
+                </div>
+
+                {/* Row 4: VERSI JAVA */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-neutral-900/40 border border-neutral-900/60 px-5 py-3.5">
+                  <span className="font-display font-black text-xs uppercase tracking-wider text-neutral-400">VERSI JAVA</span>
+                  <span className="font-mono text-sm font-semibold text-neutral-200">{SERVER_INFO.javaVersion}</span>
+                </div>
+
+                {/* Row 5: SUPPORT */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-neutral-900/40 border border-neutral-900/60 px-5 py-3.5">
+                  <span className="font-display font-black text-xs uppercase tracking-wider text-neutral-400">SUPPORT</span>
+                  <span className="font-mono text-sm font-bold text-primary">Java, Bedrock, Crack</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Copy IP & Port CTA at bottom */}
+            <div className="mt-8 pt-6 border-t border-neutral-900/80">
+              <button
+                onClick={handleCopyIpAndPort}
+                className="w-full relative flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-primary to-purple-600 px-8 py-5 text-base font-black uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all duration-200 shadow-xl shadow-purple-500/20 cursor-pointer"
+              >
+                <Icon name="Play" className="h-5 w-5 fill-white" />
+                {copiedBoth ? "IP & PORT BERHASIL DISALIN!" : "Salin IP & Port Untuk Main"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW TO JOIN */}
+      <section id="bergabung" className="py-24 px-4 bg-neutral-950/20 border-y border-neutral-900 scroll-mt-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Ayo Main Sekarang</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Cara Bergabung
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Bedrock / Mobile */}
+            <div className="glass-card rounded-2xl p-6 md:p-8 border border-purple-500/10">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="rounded-xl bg-purple-500/10 p-3 text-primary border border-purple-500/20">
+                  <Icon name="Smartphone" className="h-6 w-6" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-white">Bedrock Edition (HP / Tablet)</h3>
+              </div>
+              <ul className="space-y-4">
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <p className="text-sm text-neutral-300">Buka game Minecraft Bedrock Edition (HP/Tablet/PE).</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <p className="text-sm text-neutral-300">Pilih menu <strong className="text-white">Play</strong> lalu geser ke tab <strong className="text-white">Servers</strong>.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <p className="text-sm text-neutral-300">Klik tombol <strong className="text-white">Add Server</strong> di bagian paling bawah.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">4</span>
+                  <p className="text-sm text-neutral-300">Masukkan Nama: <strong className="text-white">Genz SMP</strong>, Alamat IP: <strong className="text-white">{SERVER_INFO.ip}</strong>, dan Port: <strong className="text-white">{SERVER_INFO.port}</strong>.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">5</span>
+                  <p className="text-sm text-neutral-300">Klik <strong className="text-white">Save</strong> lalu hubungkan ke server!</p>
+                </li>
+              </ul>
+            </div>
+
+            {/* Java / PC */}
+            <div className="glass-card rounded-2xl p-6 md:p-8 border border-purple-500/10">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="rounded-xl bg-purple-500/10 p-3 text-primary border border-purple-500/20">
+                  <Icon name="Laptop" className="h-6 w-6" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-white">Java Edition (PC / Laptop)</h3>
+              </div>
+              <ul className="space-y-4">
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <p className="text-sm text-neutral-300">Jalankan Minecraft Java Edition di PC / Laptop Anda.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <p className="text-sm text-neutral-300">Klik menu <strong className="text-white">Multiplayer</strong> di halaman utama.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <p className="text-sm text-neutral-300">Pilih tombol <strong className="text-white">Add Server</strong> di pojok kanan bawah.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">4</span>
+                  <p className="text-sm text-neutral-300">Isi Nama: <strong className="text-white">Genz SMP</strong>, dan Alamat Server: <strong className="text-white">{SERVER_INFO.ip}</strong>.</p>
+                </li>
+                <li className="flex gap-4">
+                  <span className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-bold text-primary flex items-center justify-center shrink-0 mt-0.5">5</span>
+                  <p className="text-sm text-neutral-300">Tekan <strong className="text-white">Done</strong>, klik servernya, dan mulailah bermain!</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* HUBUNGI ADMIN */}
+      <section id="hubungi-admin" className="py-24 px-4 bg-neutral-950/20 border-b border-neutral-900/60 scroll-mt-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Layanan Bantuan</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Hubungi Admin
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+            <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
+              Butuh bantuan teknis, ingin melaporkan bug, atau melakukan klaim donasi? Hubungi tim administrator resmi Genz SMP di bawah ini.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Admin 1: Owner */}
+            <div className="glass-card rounded-2xl p-6 md:p-8 border border-purple-500/10 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 h-24 w-24 rounded-full bg-purple-500/5 blur-xl group-hover:bg-purple-500/10 transition-colors" />
+
+              <div className="relative shrink-0">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 p-0.5 shadow-lg">
+                  <div className="h-full w-full rounded-2xl bg-neutral-900 flex items-center justify-center">
+                    <Icon name="Shield" className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-neutral-950"></span>
+                </span>
+              </div>
+
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 mb-2">
+                  <h3 className="font-display font-bold text-lg text-white">{SERVER_INFO.admin1.name}</h3>
+                  <span className="inline-block mx-auto md:mx-0 rounded-full bg-purple-500/15 border border-purple-500/25 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                    {SERVER_INFO.admin1.role}
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed mb-6">
+                  {SERVER_INFO.admin1.description}
+                </p>
+                <a
+                  href={SERVER_INFO.admin1.contact}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/10 transition-all cursor-pointer"
+                >
+                  <Icon name="Phone" className="h-4 w-4" /> Hubungi Owner via WA
+                </a>
+              </div>
+            </div>
+
+            {/* Admin 2: Co-Owner */}
+            <div className="glass-card rounded-2xl p-6 md:p-8 border border-purple-500/10 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 h-24 w-24 rounded-full bg-purple-500/5 blur-xl group-hover:bg-purple-500/10 transition-colors" />
+
+              <div className="relative shrink-0">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-purple-600 p-0.5 shadow-lg">
+                  <div className="h-full w-full rounded-2xl bg-neutral-900 flex items-center justify-center">
+                    <Icon name="User" className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-neutral-950"></span>
+                </span>
+              </div>
+
+              <div className="flex-1 text-center md:text-left">
+                <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 mb-2">
+                  <h3 className="font-display font-bold text-lg text-white">{SERVER_INFO.admin2.name}</h3>
+                  <span className="inline-block mx-auto md:mx-0 rounded-full bg-purple-500/15 border border-purple-500/25 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                    {SERVER_INFO.admin2.role}
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed mb-6">
+                  {SERVER_INFO.admin2.description}
+                </p>
+                <a
+                  href={SERVER_INFO.admin2.contact}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/10 transition-all cursor-pointer"
+                >
+                  <Icon name="Phone" className="h-4 w-4" /> Hubungi Support via WA
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="fitur" className="py-24 px-4 scroll-mt-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Sistem & Kelebihan</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Fitur Unggulan
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {FEATURES.map((feat) => (
+              <div key={feat.id} className="glass-card glass-card-hover rounded-2xl p-6 border border-purple-500/10 flex flex-col items-start">
+                <div className="rounded-xl bg-purple-500/10 p-3 text-primary border border-purple-500/20 mb-4 shrink-0">
+                  <Icon name={feat.icon} className="h-6 w-6" />
+                </div>
+                <h3 className="font-display font-bold text-lg text-white mb-2">{feat.name}</h3>
+                <p className="text-xs text-neutral-400 leading-relaxed">{feat.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* INTERACTIVE TABS PANEL (OFFICIAL STORE) */}
+      <section id="rank-money" className="py-24 px-4 bg-neutral-950/20 border-y border-neutral-900 scroll-mt-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Toko Resmi Server</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Toko Resmi Genz SMP
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+            <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
+              Dukung keberlangsungan server Genz SMP dengan membeli Rank VIP, Saldo Money, dan fasilitas premium menarik lainnya secara instan.
+            </p>
+          </div>
+
+          {/* Tab buttons */}
+          <div className="flex flex-wrap justify-center gap-2 mb-12">
+            {[
+              { id: "ranks", label: "Beli Rank VIP", icon: "Award" },
+              { id: "money", label: "Sistem Money", icon: "Coins" },
+              { id: "skills", label: "Skills McMMO", icon: "Flame" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2.5 rounded-xl px-5 py-3 text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                  activeTab === tab.id
+                    ? "bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-purple-500/25"
+                    : "bg-neutral-900/60 hover:bg-neutral-900 text-neutral-400 border border-neutral-800"
+                }`}
+              >
+                <Icon name={tab.icon} className="h-5 w-5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="min-h-[400px]">
+
+            {/* RANKS TAB */}
+            {activeTab === "ranks" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
+                {RANKS.map((rank) => (
+                  <div key={rank.id} className="glass-card rounded-2xl p-6 border border-purple-500/10 flex flex-col justify-between relative overflow-hidden group">
+                    <div className={`absolute top-0 right-0 h-24 w-24 rounded-full bg-gradient-to-br ${rank.color} opacity-5 blur-xl group-hover:opacity-10 transition-opacity`} />
+                    <div>
+                      <span className={`inline-block rounded bg-gradient-to-r ${rank.color} px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white mb-4`}>
+                        Vip Access
+                      </span>
+                      <h3 className="font-display font-bold text-2xl text-white mb-1">{rank.name}</h3>
+                      <p className="text-xs text-neutral-400 font-mono mt-2 mb-4 leading-relaxed">{rank.description}</p>
+                      <div className="h-px bg-neutral-900 my-4" />
+                      <p className="text-xl font-black text-primary font-display">{rank.price}</p>
+                    </div>
+                    <div className="mt-6 flex flex-col gap-2">
+                      <button
+                        onClick={() => openCheckoutModal(rank)}
+                        className="w-full rounded-xl bg-gradient-to-r from-primary to-purple-600 py-3 text-center text-xs font-bold uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-purple-500/25 flex items-center justify-center gap-1.5"
+                      >
+                        <Icon name="ShoppingBag" className="h-4 w-4" /> Beli / Checkout
+                      </button>
+                      <button
+                        onClick={() => openDetailModal(rank.name, "rank", rank.color, rank.price, rank.description, rank.perks)}
+                        className="w-full rounded-xl bg-neutral-900 hover:bg-neutral-950 hover:border-purple-500/40 border border-neutral-800 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider text-neutral-300 hover:text-white transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Icon name="Eye" className="h-3.5 w-3.5" /> Lihat Keuntungan
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ECONOMY TAB */}
+            {activeTab === "money" && (
+              <div className="space-y-10 animate-fade-in-up">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {[
+                    { title: "Bekerja (Jobs)", icon: "Briefcase", desc: "Selesaikan profesi harian Anda seperti lumberjack, miner, farmer, hunter untuk mendapatkan Money gratis langsung setiap detik." },
+                    { title: "Toko Player (/warp toko)", icon: "Store", desc: "Bangun toko kustom Anda sendiri, sewalah chest-shop, pajang stok blok hiasan, dan tetapkan harga yang menguntungkan." },
+                    { title: "Rumah Lelang (/ah)", icon: "ShoppingBag", desc: "Tempat lelang global di mana Anda bisa menjual senjata, ramuan, material langka, dan kosmetik ke penawar tertinggi secara instan." }
+                  ].map((item, idx) => (
+                    <div key={idx} className="glass-card rounded-2xl p-6 border border-purple-500/10">
+                      <div className="rounded-xl bg-purple-500/10 p-3 text-primary border border-purple-500/20 mb-4 w-12 flex items-center justify-center">
+                        <Icon name={item.icon} className="h-6 w-6" />
+                      </div>
+                      <h3 className="font-display font-bold text-lg text-white mb-2">{item.title}</h3>
+                      <p className="text-xs text-neutral-400 leading-relaxed mb-4">{item.desc}</p>
+                      <button
+                        onClick={() => openDetailModal(item.title, "money", "from-purple-500 to-indigo-600", "Panduan Finansial Money", item.desc, [
+                          "Akses perintah /jobs join untuk mulai bekerja",
+                          "Gunakan /warp toko untuk melihat lapak dagang pemain lain",
+                          "Ketik /ah untuk membuka pasar lelang global",
+                          "Hasilkan jutaan rupiah Money dan jadilah pemain terkaya!"
+                        ])}
+                        className="text-xs font-bold text-primary hover:text-white transition-colors cursor-pointer"
+                      >
+                        Pelajari Selengkapnya →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* MONEY PURCHASES */}
+                <div className="mt-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Icon name="Coins" className="h-5 w-5 text-primary" />
+                    <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">Beli Saldo Money Server</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {MONEY_PACKAGES.map((pkg) => (
+                      <div 
+                        key={pkg.id} 
+                        className="glass-card rounded-xl p-5 border border-purple-500/10 hover:border-purple-500/30 transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          <span className="inline-block rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider mb-3">
+                            Instant Delivery
+                          </span>
+                          <h4 className="font-display font-bold text-white text-sm mb-1">{pkg.name}</h4>
+                          <p className="text-[10px] text-neutral-400">Saldo game resmi</p>
+                        </div>
+                        <div className="mt-5 pt-4 border-t border-neutral-900 flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-bold text-primary">{pkg.price}</span>
+                          <button
+                            onClick={() => openCheckoutModal(pkg)}
+                            className="rounded-lg bg-gradient-to-r from-primary to-purple-600 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <Icon name="ShoppingBag" className="h-3 w-3" /> Beli
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MCMMO SKILLS TAB */}
+            {activeTab === "skills" && (
+              <div className="space-y-10 animate-fade-in-up">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {SKILLS.map((skill) => (
+                    <div key={skill.id} className="glass-card rounded-2xl p-6 border border-purple-500/10 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-3 mb-4">
+                          <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+                          <h3 className="font-display font-bold text-lg text-white">{skill.name}</h3>
+                        </div>
+                        <p className="text-xs text-neutral-400 leading-relaxed mb-4">{skill.description}</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-4 border-t border-neutral-900/60">
+                        <span className="text-xs font-mono text-purple-400 font-semibold">{skill.levels}</span>
+                        <button
+                          onClick={() => openDetailModal(skill.name, "skill", "from-purple-500 to-pink-600", "Sistem McMMO Premium", skill.description, [
+                            `Batas level maksimal: ${skill.levels}`,
+                            "Dapatkan skill aktif khusus (seperti Super Breaker, Tree Feller)",
+                            "Persentase drop ganda (Double Drops) meningkat seiring level",
+                            "Cooldown skill berkurang secara bertahap seiring bertambahnya level"
+                          ])}
+                          className="text-xs font-bold text-primary hover:text-white transition-colors cursor-pointer"
+                        >
+                          Lihat Skill Tree
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* SKILLS PURCHASES */}
+                <div className="mt-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Icon name="Flame" className="h-5 w-5 text-primary" />
+                    <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">Beli Level Skills McMMO</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                    {SKILL_PACKAGES.map((pkg) => (
+                      <div 
+                        key={pkg.id} 
+                        className="glass-card rounded-xl p-4 border border-purple-500/10 hover:border-purple-500/30 transition-all flex flex-col justify-between"
+                      >
+                        <div>
+                          <span className="inline-block rounded-full bg-purple-500/10 border border-purple-500/20 text-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider mb-3">
+                            EXP Boost
+                          </span>
+                          <h4 className="font-display font-bold text-white text-xs mb-1">{pkg.name}</h4>
+                          <p className="text-[10px] text-neutral-400">Tingkatkan McMMO</p>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-neutral-900 flex items-center justify-between gap-1">
+                          <span className="font-mono text-[11px] font-bold text-primary">{pkg.price}</span>
+                          <button
+                            onClick={() => openCheckoutModal(pkg)}
+                            className="rounded-lg bg-gradient-to-r from-primary to-purple-600 px-2 py-1 text-center text-[9px] font-bold uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center gap-0.5 shrink-0"
+                          >
+                            <Icon name="ShoppingBag" className="h-2.5 w-2.5" /> Beli
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </section>
+
+      {/* DOCUMENTATION GALLERY */}
+      <section id="gallery" className="py-24 px-4 scroll-mt-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Keindahan Dunia Kami</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Gallery Dokumentasi
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+            <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
+              Dokumentasi keindahan dunia, keseruan pertarungan boss, dan kemegahan spawn point Genz SMP. Klik gambar untuk melihat penuh.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {GALLERY_ITEMS.map((item, idx) => (
+              <div 
+                key={item.id} 
+                onClick={() => openLightbox(idx)}
+                className="group cursor-pointer relative overflow-hidden rounded-2xl border border-purple-500/10 shadow-lg aspect-[16/10]"
+              >
+                <img 
+                  src={item.image} 
+                  alt="" 
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VOTING REWARDS */}
+      <section id="vote" className="py-24 px-4 bg-neutral-950/20 border-y border-neutral-900 scroll-mt-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Dukung Server Kami</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Voting & Rewards
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+            <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
+              Bantu server kami berkembang dan raih ranking tertinggi! Setiap vote bernilai 1x Kunci Gacha VIP, Money gratis, dan booster EXP instan.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {VOTE_LINKS.map((link) => (
+              <div 
+                key={link.id} 
+                className="glass-card rounded-2xl p-6 border border-purple-500/10 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10 text-primary border border-purple-500/20 mb-4">
+                    <Icon name="Award" className="h-6 w-6" />
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-white mb-1">{link.name}</h3>
+                  <p className="text-xs text-neutral-400">Dapatkan 3x vote key gratis.</p>
+                  <p className="text-xs text-neutral-400">Dapatkan 50k money ingame gratis.</p>
+                </div>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-purple-600 py-3 text-center text-xs font-bold uppercase tracking-wider text-white hover:brightness-110 active:scale-95 transition-all duration-200"
+                >
+                  Vote Sekarang <Icon name="ExternalLink" className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom info panel */}
+          <div className="mt-10 rounded-2xl bg-purple-500/5 border border-purple-500/15 p-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="rounded-xl bg-purple-500/10 p-3 text-primary border border-purple-500/10 shrink-0">
+                <Icon name="Gift" className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="font-display font-bold text-white text-base">Bagaimana Cara Mengklaim Hadiah?</h4>
+                <p className="text-xs text-neutral-400 mt-1 max-w-xl">
+                  Cukup masukkan username Minecraft Anda di form web voting di atas. Saat Anda login kembali ke dalam server Genz SMP, hadiah Anda akan dikirim secara otomatis ke inventory!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SERVER RULES */}
+      <section id="aturan" className="py-24 px-4 scroll-mt-10">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-primary">Komunitas Sehat & Nyaman</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Aturan Server
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-primary mx-auto rounded-full" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {RULES.map((rule) => (
+              <div 
+                key={rule.number}
+                className="glass-card rounded-2xl p-6 border border-purple-500/10 relative overflow-hidden group"
+              >
+                <div className="absolute -top-6 -right-6 font-display text-8xl font-black text-purple-500/5 select-none transition-colors group-hover:text-purple-500/10">
+                  {rule.number}
+                </div>
+                <div className="relative z-10">
+                  <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-primary border border-purple-500/20 font-mono font-bold flex items-center justify-center mb-4 text-base">
+                    {rule.number}
+                  </div>
+                  <h3 className="font-display font-bold text-lg text-white mb-2">{rule.title}</h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">{rule.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* BAN & SANCTION HISTORY */}
+      <section id="larangan" className="py-24 px-4 bg-neutral-950/20 border-y border-neutral-900 scroll-mt-10">
+        <div className="mx-auto max-w-6xl">
+          <div className="text-center mb-16">
+            <span className="text-xs font-bold uppercase tracking-widest text-red-500">Tindakan Pelanggaran</span>
+            <h2 className="mt-2 font-display text-4xl font-black text-white uppercase tracking-tight md:text-5xl">
+              Sanksi Larangan
+            </h2>
+            <div className="mt-3 h-1 w-20 bg-red-600 mx-auto rounded-full" />
+            <p className="mt-4 text-neutral-400 max-w-xl mx-auto text-xs md:text-sm">
+              Tindakan di bawah ini dilarang keras! Pelanggaran akan dikenai sanksi tegas mulai dari Mute Chat, Ban Sementara, hingga Ban IP dari jaringan Genz SMP.
+            </p>
+          </div>
+
+          {/* Filter and Search controls */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-8 justify-between">
+            <div className="relative flex-1 max-w-md">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-neutral-500">
+                <Icon name="Search" className="h-4 w-4" />
+              </span>
+              <input
+                type="text"
+                placeholder="Cari jenis pelanggaran..."
+                value={banQuery}
+                onChange={(e) => setBanQuery(e.target.value)}
+                className="w-full rounded-xl bg-neutral-900/60 border border-neutral-800 focus:border-red-500/40 focus:outline-none pl-11 pr-4 py-3 text-sm text-white placeholder-neutral-500"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              {["All", "Ban IP", "Ban 3 Hari", "Ban 1 Hari", "Mute"].map((sev) => (
+                <button
+                  key={sev}
+                  onClick={() => setBanFilter(sev)}
+                  className={`rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
+                    banFilter === sev
+                      ? "bg-red-600/10 text-red-500 border-red-500/30 shadow-lg shadow-red-500/5"
+                      : "bg-neutral-900/60 border-neutral-800 text-neutral-400 hover:text-white"
+                  }`}
+                >
+                  {sev === "All" ? "Semua" : sev}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bans Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredBans.length > 0 ? (
+              filteredBans.map((ban, index) => (
+                <div 
+                  key={index} 
+                  className="glass-card rounded-2xl p-6 border border-neutral-800 hover:border-red-500/20 transition-all duration-300"
+                >
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <h3 className="font-display font-bold text-base text-white">{ban.title}</h3>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      ban.severity.includes("IP")
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : ban.severity.includes("Ban")
+                        ? "bg-orange-500/10 text-orange-400 border border-orange-500/20"
+                        : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                    }`}>
+                      {ban.severity}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-400 leading-relaxed">{ban.description}</p>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center text-neutral-500 font-medium text-sm">
+                Tidak ada pelanggaran yang cocok dengan kriteria pencarian.
+              </div>
+            )}
+          </div>
+
+          {/* Abuse reporting */}
+          <div className="mt-12 rounded-2xl bg-red-600/5 border border-red-600/15 p-6 flex items-center gap-4">
+            <div className="rounded-xl bg-red-600/10 p-3 text-red-400 border border-red-600/10 shrink-0">
+              <Icon name="ShieldAlert" className="h-6 w-6" />
+            </div>
+            <div>
+              <h4 className="font-display font-bold text-white text-base">Sistem Pengaduan Staff</h4>
+              <p className="text-xs text-neutral-400 mt-1">
+                Jika Anda melihat pemain yang melanggar ketentuan di atas, harap rekam screenshot/video bukti yang jelas dan laporkan langsung ke kanal pengaduan kami di Discord server Genz SMP.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="bg-neutral-950 border-t border-neutral-900 pt-16 pb-8 px-4 relative z-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+
+            {/* Brand Column */}
+            <div className="space-y-4">
+              <a href="#hero" className="flex items-center gap-3">
+                <img 
+                  src={IMAGES.logoImg} 
+                  alt="Logo" 
+                  referrerPolicy="no-referrer"
+                  className="h-10 w-10 rounded-xl border border-purple-500/30 object-cover"
+                />
+                <span className="font-display text-xl font-black uppercase tracking-wider text-white">
+                  {SERVER_INFO.name}<span className="text-primary">{SERVER_INFO.suffix}</span>
+                </span>
+              </a>
+              <p className="text-xs text-neutral-400 leading-relaxed">
+                Genz SMP adalah server Minecraft Indonesia yang didukung oleh komunitas ramah, performa server handal tanpa lag, serta admin handal yang siap membantu 24/7.
+              </p>
+            </div>
+
+            {/* Nav Links Column */}
+            <div>
+              <h4 className="font-display font-bold text-sm uppercase tracking-wider text-white mb-4">Navigasi Cepat</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#hero" className="text-neutral-400 hover:text-primary transition-colors">Halaman Utama</a></li>
+                <li><a href="#portal" className="text-neutral-400 hover:text-primary transition-colors">Portal Koneksi</a></li>
+                <li><a href="#bergabung" className="text-neutral-400 hover:text-primary transition-colors">Cara Bermain</a></li>
+                <li><a href="#fitur" className="text-neutral-400 hover:text-primary transition-colors">Sistem Fitur</a></li>
+              </ul>
+            </div>
+
+            {/* Supports Column */}
+            <div>
+              <h4 className="font-display font-bold text-sm uppercase tracking-wider text-white mb-4">Layanan Server</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#rank-money" className="text-neutral-400 hover:text-primary transition-colors">Donasi Ranks</a></li>
+                <li><a href="#vote" className="text-neutral-400 hover:text-primary transition-colors">Situs Vote</a></li>
+                <li><a href="#aturan" className="text-neutral-400 hover:text-primary transition-colors">Aturan Komunitas</a></li>
+                <li><a href="#larangan" className="text-neutral-400 hover:text-primary transition-colors">Larangan & Ban</a></li>
+              </ul>
+            </div>
+
+            {/* Socials Column */}
+            <div className="space-y-4">
+              <h4 className="font-display font-bold text-sm uppercase tracking-wider text-white mb-4">Sosial Media & Komunitas</h4>
+              <div className="flex gap-2">
+                <a href={SERVER_INFO.discordUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-neutral-900 border border-neutral-800 p-2.5 text-neutral-400 hover:border-primary hover:text-white transition-colors" aria-label="Discord">
+                  <Icon name="MessageSquare" className="h-5 w-5" />
+                </a>
+                <a href={SERVER_INFO.whatsappUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-neutral-900 border border-neutral-800 p-2.5 text-neutral-400 hover:border-primary hover:text-white transition-colors" aria-label="WhatsApp">
+                  <Icon name="Phone" className="h-5 w-5" />
+                </a>
+                <a href={SERVER_INFO.youtubeUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-neutral-900 border border-neutral-800 p-2.5 text-neutral-400 hover:border-primary hover:text-white transition-colors" aria-label="YouTube">
+                  <Icon name="Youtube" className="h-5 w-5" />
+                </a>
+                <a href={SERVER_INFO.instagramUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-neutral-900 border border-neutral-800 p-2.5 text-neutral-400 hover:border-primary hover:text-white transition-colors" aria-label="Instagram">
+                  <Icon name="Instagram" className="h-5 w-5" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-neutral-900 mb-8" />
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-[10px] text-neutral-600">
+              &copy; {new Date().getFullYear()} {SERVER_INFO.name} Network. All Rights Reserved. Powered by Laravel.
+            </p>
+            <p className="text-[10px] text-neutral-600 max-w-md sm:text-right leading-relaxed">
+              Genz SMP is not affiliated with Mojang Studios or Microsoft Corporation. Minecraft is a trademark of Mojang Synergies AB.
+            </p>
+          </div>
+        </div>
+      </footer>
+
+      {/* BACK TO TOP */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-40 rounded-full bg-gradient-to-br from-primary to-purple-600 p-3.5 text-white border border-purple-500/20 shadow-2xl hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-purple-500/25 shadow-lg"
+          aria-label="Back to top"
+        >
+          <Icon name="ArrowUp" className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* MODAL MOUNT */}
+      <DetailModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={modalData.title}
+        type={modalData.type}
+        colorClass={modalData.colorClass}
+        subtitle={modalData.subtitle}
+        description={modalData.description}
+        listItems={modalData.listItems}
+        cooldown={modalData.cooldown}
+        onCheckout={(rank) => openCheckoutModal(rank)}
+      />
+
+      {/* CHECKOUT MODAL MOUNT */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        selectedItem={checkoutItem}
+        itemsList={ALL_CHECKOUT_ITEMS}
+      />
+
+      {/* LIGHTBOX MOUNT */}
+      <Lightbox
+        isOpen={isLightboxOpen}
+        onClose={() => setIsLightboxOpen(false)}
+        items={GALLERY_ITEMS}
+        currentIndex={lightboxIndex}
+        onNavigate={(index) => setLightboxIndex(index)}
+      />
+
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
