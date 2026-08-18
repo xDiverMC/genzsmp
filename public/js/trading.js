@@ -1,16 +1,16 @@
 // =======================================================
-//   GENZSMP WEB TRADING CONTROLLER & WS ENGINE
+//   GENZSMP WEB TRADING CONTROLLER & PIN SECURITY ENGINE
 // =======================================================
 
 const CONFIG = window.TRADING_CONFIG || {};
 
 const state = {
   session: {
-    active: false,
-    isDemo: false,
-    token: CONFIG.token || '',
-    playerName: CONFIG.player || 'Investor',
+    isLoggedIn: false,
+    playerName: '',
     uuid: '',
+    isBedrock: false,
+    hasPin: false,
     cashBalance: 0.00,
     expireSeconds: CONFIG.sessionTtlSeconds || 900
   },
@@ -19,6 +19,7 @@ const state = {
   timeframe: '5M',
   cooldownActive: false,
   cooldownRemaining: 0,
+  pendingTrade: null, // holds order details waiting for PIN confirmation
   assets: {
     btc: {
       symbol: 'BTC',
@@ -92,8 +93,6 @@ const state = {
 };
 
 let chartInstance = null;
-let wsClient = null;
-let sessionTimer = null;
 let cooldownTimer = null;
 
 // =======================================================
@@ -111,9 +110,18 @@ document.addEventListener('DOMContentLoaded', () => {
   renderOrderbook();
   calculateTradeCost();
 
-  // If accessed with valid token, start WebSocket
-  if (CONFIG.isValidAccess) {
-    initWebSocket();
+  // Check login: URL query param or saved localStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const playerParam = urlParams.get('player');
+  const savedPlayer = localStorage.getItem('genzsmp_trading_player');
+
+  if (playerParam) {
+    loginPlayer(playerParam);
+  } else if (savedPlayer) {
+    loginPlayer(savedPlayer);
+  } else {
+    // Show login modal for initial access
+    openLoginModal();
   }
 
   // Start periodic price pulse simulation
@@ -121,169 +129,399 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =======================================================
-//   WEBSOCKET CLIENT ENGINE (CONNECTS TO ARQOINVEST 8088)
+//   AUTHENTICATION & USERNAME LOGIN
 // =======================================================
-function initWebSocket() {
-  const host = CONFIG.wsHost || window.location.hostname || '178.128.105.129';
-  const port = CONFIG.wsPort || 8088;
-  const wsUrl = `ws://${host}:${port}`;
-
-  const statusBadge = document.getElementById('ws-status-badge');
-  const statusDot = document.getElementById('ws-status-dot');
-  const statusText = document.getElementById('ws-status-text');
-
-  try {
-    statusText.textContent = `Menghubungkan ke ${host}:${port}...`;
-    wsClient = new WebSocket(wsUrl);
-
-    wsClient.onopen = () => {
-      console.log('[ArqoInvest WS] Connected to Java Server!');
-      statusDot.className = 'h-2 w-2 rounded-full bg-emerald-400';
-      statusText.textContent = 'Server Java Terhubung';
-      statusBadge.classList.remove('hidden');
-
-      // Send AUTH Handshake
-      wsClient.send(JSON.stringify({
-        type: 'AUTH',
-        token: state.session.token
-      }));
-    };
-
-    wsClient.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        handleServerMessage(msg);
-      } catch (err) {
-        console.warn('[ArqoInvest WS] JSON parse error:', err);
-      }
-    };
-
-    wsClient.onerror = (err) => {
-      console.log('[ArqoInvest WS] Connection error or offline.');
-      statusDot.className = 'h-2 w-2 rounded-full bg-red-400';
-      statusText.textContent = 'WS Offline (Demo Fallback)';
-    };
-
-    wsClient.onclose = () => {
-      console.log('[ArqoInvest WS] Disconnected.');
-      statusDot.className = 'h-2 w-2 rounded-full bg-yellow-400';
-      statusText.textContent = 'WS Terputus';
-    };
-  } catch (e) {
-    console.log('[ArqoInvest WS] WebSocket init error:', e);
+function openLoginModal() {
+  const modal = document.getElementById('login-modal');
+  const input = document.getElementById('login-username-input');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (input) {
+      input.value = state.session.playerName || '';
+      setTimeout(() => input.focus(), 100);
+    }
   }
 }
 
-function handleServerMessage(msg) {
-  if (!msg || !msg.type) return;
+function closeLoginModal() {
+  const modal = document.getElementById('login-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
 
-  switch (msg.type) {
-    case 'AUTH_SUCCESS':
-      state.session.active = true;
-      state.session.playerName = msg.playerName || state.session.playerName;
-      state.session.uuid = msg.uuid || '';
-      state.session.cashBalance = msg.cashBalance !== undefined ? msg.cashBalance : state.session.cashBalance;
-      state.session.expireSeconds = msg.remainingSeconds || 900;
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('login-username-input');
+  const username = input.value.trim();
+  if (!username) return;
 
-      if (msg.portfolio) {
-        Object.keys(msg.portfolio).forEach(k => {
+  const btn = document.getElementById('login-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Memuat Data Akun...';
+
+  try {
+    await loginPlayer(username);
+    closeLoginModal();
+  } catch (err) {
+    showToast('Gagal memuat data akun Minecraft.', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Masuk & Buka Portofolio';
+  }
+}
+
+async function loginPlayer(playerName) {
+  try {
+    const res = await fetch('/api/trading/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({ player_name: playerName })
+    });
+
+    const json = await res.json();
+    if (json.success && json.data) {
+      const u = json.data.user;
+      state.session.isLoggedIn = true;
+      state.session.playerName = u.player_name;
+      state.session.uuid = u.uuid || '';
+      state.session.isBedrock = u.is_bedrock;
+      state.session.hasPin = u.has_pin;
+      state.session.cashBalance = u.cash_balance;
+
+      // Save to localStorage for seamless re-visits
+      localStorage.setItem('genzsmp_trading_player', u.player_name);
+
+      // Load Portfolios
+      if (json.data.portfolio) {
+        Object.keys(json.data.portfolio).forEach(k => {
           if (state.portfolio[k]) {
-            state.portfolio[k].amount = msg.portfolio[k][0] || 0;
-            state.portfolio[k].avgBuyPrice = msg.portfolio[k][1] || 0;
+            state.portfolio[k].amount = json.data.portfolio[k][0] || 0;
+            state.portfolio[k].avgBuyPrice = json.data.portfolio[k][1] || 0;
           }
         });
       }
 
-      startSessionCountdown();
-      updateBalanceDisplays();
-      renderPortfolioTable();
-      showToast(`Selamat datang ${state.session.playerName}! Sesi trading aktif.`, 'success');
-      break;
-
-    case 'TRADE_SUCCESS':
-      state.session.cashBalance = msg.newBalance;
-      updateBalanceDisplays();
-      renderPortfolioTable();
-      showToast(`Transaksi ${msg.tradeType} ${msg.amount} Berhasil! Saldo Baru: $${msg.newBalance.toLocaleString()}`, 'success');
-      break;
-
-    case 'NEWS_UPDATE':
-      if (msg.headline) {
-        updateTickerHeadline(msg.headline, msg.asset, msg.changePercent);
-        showToast(`📰 GenzNews: ${msg.headline}`, 'info');
+      // Load Trade Logs
+      if (json.data.trades && Array.isArray(json.data.trades)) {
+        state.tradeLogs = json.data.trades.map(t => {
+          const d = new Date(t.created_at);
+          return {
+            time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`,
+            type: t.trade_type,
+            asset: t.asset,
+            amount: t.amount,
+            price: t.price,
+            total: t.total
+          };
+        });
       }
-      break;
 
-    case 'SESSION_TERMINATED':
-      showSessionTerminatedModal(msg.reason || 'Sesi web trading telah dimatikan.');
-      break;
+      updateUserProfileUI();
+      renderPortfolioTable();
+      renderTradeHistory();
+      calculateTradeCost();
 
-    case 'ERROR':
-      showToast(`⚠️ ${msg.message || 'Terjadi kesalahan transaksi.'}`, 'danger');
-      break;
+      showToast(`Selamat datang ${u.player_name}! Portofolio aktif.`, 'success');
+    } else {
+      showToast(json.message || 'Gagal login ke server.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error logging in:', err);
+    showToast('Terjadi kesalahan koneksi ke backend.', 'danger');
+  }
+}
+
+function updateUserProfileUI() {
+  const profileBar = document.getElementById('player-profile-bar');
+  const loginBtn = document.getElementById('login-trigger-btn');
+  const nameDisplay = document.getElementById('player-name-display');
+  const bedrockBadge = document.getElementById('player-bedrock-badge');
+  const cashDisplay = document.getElementById('player-cash-display');
+  const pinBadge = document.getElementById('pin-status-badge');
+
+  if (state.session.isLoggedIn) {
+    if (profileBar) {
+      profileBar.classList.remove('hidden');
+      profileBar.classList.add('flex');
+    }
+    if (loginBtn) loginBtn.classList.add('hidden');
+
+    if (nameDisplay) nameDisplay.textContent = state.session.playerName;
+    
+    if (bedrockBadge) {
+      if (state.session.isBedrock || state.session.playerName.startsWith('.')) {
+        bedrockBadge.classList.remove('hidden');
+      } else {
+        bedrockBadge.classList.add('hidden');
+      }
+    }
+
+    if (cashDisplay) {
+      cashDisplay.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    }
+
+    if (pinBadge) {
+      if (state.session.hasPin) {
+        pinBadge.className = 'text-[9px] font-mono text-emerald-400 font-bold';
+        pinBadge.textContent = '● PIN: Aktif';
+      } else {
+        pinBadge.className = 'text-[9px] font-mono text-amber-400 font-bold';
+        pinBadge.textContent = '● PIN: Belum Diatur';
+      }
+    }
+  } else {
+    if (profileBar) {
+      profileBar.classList.add('hidden');
+      profileBar.classList.remove('flex');
+    }
+    if (loginBtn) loginBtn.classList.remove('hidden');
+  }
+
+  updateBalanceDisplays();
+  if (window.lucide) {
+    lucide.createIcons();
   }
 }
 
 // =======================================================
-//   SESSION & DEMO MODE
+//   6-DIGIT PIN SECURITY MODAL & TRADE EXECUTION
 // =======================================================
-function startDemoMode() {
-  state.session.active = true;
-  state.session.isDemo = true;
-  state.session.playerName = 'DemoTrader';
-  state.session.cashBalance = 50000.00;
-  state.session.expireSeconds = 1800;
+function promptPinModal(e) {
+  e.preventDefault();
 
-  // Add initial demo portfolio
-  state.portfolio.btc = { amount: 1.5, avgBuyPrice: 980 };
-  state.portfolio.eth = { amount: 4.0, avgBuyPrice: 505 };
+  if (!state.session.isLoggedIn) {
+    showToast('Silakan masuk dengan akun Minecraft terlebih dahulu!', 'danger');
+    openLoginModal();
+    return;
+  }
 
-  document.getElementById('access-denied-modal').classList.add('hidden');
-  document.getElementById('access-denied-modal').classList.remove('flex');
+  if (state.cooldownActive) {
+    showToast(`Tunggu Anti-Whale cooldown (${state.cooldownRemaining}s)!`, 'danger');
+    return;
+  }
 
-  const statusBadge = document.getElementById('ws-status-badge');
-  const statusDot = document.getElementById('ws-status-dot');
-  const statusText = document.getElementById('ws-status-text');
+  const input = document.getElementById('trade-amount-input');
+  const amount = parseFloat(input.value);
+  const assetKey = state.activeAsset;
+  const asset = state.assets[assetKey];
 
-  statusDot.className = 'h-2 w-2 rounded-full bg-purple-400';
-  statusText.textContent = 'Mode Demo (Preview)';
-  statusBadge.classList.remove('hidden');
+  if (!amount || amount <= 0) {
+    showToast('Masukkan jumlah unit transaksi yang valid!', 'danger');
+    return;
+  }
 
-  startSessionCountdown();
-  updateBalanceDisplays();
-  renderPortfolioTable();
-  calculateTradeCost();
-  showToast('Mode Demo Aktif! Saldo virtual: $50,000.00', 'info');
-}
+  if (amount > 1000) {
+    showToast('Maksimal order 1,000 unit per transaksi!', 'danger');
+    return;
+  }
 
-function startSessionCountdown() {
-  if (sessionTimer) clearInterval(sessionTimer);
+  const subtotal = amount * asset.price;
+  const tax = subtotal * 0.02;
+  const total = state.activeTradeType === 'BUY' ? subtotal + tax : subtotal - tax;
 
-  const display = document.getElementById('session-timer-display');
-  sessionTimer = setInterval(() => {
-    state.session.expireSeconds--;
-    if (state.session.expireSeconds <= 0) {
-      clearInterval(sessionTimer);
-      showSessionTerminatedModal('Waktu sesi trading 15 menit telah habis.');
+  if (state.activeTradeType === 'BUY' && state.session.cashBalance < total) {
+    showToast(`Saldo kas Vault tidak cukup! Total dibutuhkan: $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'danger');
+    return;
+  }
+
+  if (state.activeTradeType === 'SELL') {
+    const owned = state.portfolio[assetKey]?.amount || 0;
+    if (owned < amount) {
+      showToast(`Jumlah ${asset.symbol} tidak cukup! Kamu hanya memiliki ${owned.toFixed(2)} ${asset.symbol}.`, 'danger');
       return;
     }
+  }
 
-    const mins = Math.floor(state.session.expireSeconds / 60);
-    const secs = state.session.expireSeconds % 60;
-    if (display) {
-      display.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-  }, 1000);
+  // Save pending order details
+  state.pendingTrade = {
+    tradeType: state.activeTradeType,
+    assetKey: assetKey,
+    assetSymbol: asset.symbol,
+    amount: amount,
+    price: asset.price,
+    total: total
+  };
+
+  // Populate PIN Modal UI
+  const pinModal = document.getElementById('pin-modal');
+  const summaryAction = document.getElementById('pin-summary-action');
+  const summaryTotal = document.getElementById('pin-summary-total');
+  const summaryPlayer = document.getElementById('pin-summary-player');
+  const pinInput = document.getElementById('pin-input');
+  const pinError = document.getElementById('pin-error-msg');
+  const notSetNotice = document.getElementById('pin-not-set-notice');
+  const confirmBtn = document.getElementById('pin-confirm-btn');
+
+  summaryAction.textContent = `${state.activeTradeType} ${amount} ${asset.symbol}`;
+  summaryTotal.textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  summaryPlayer.textContent = state.session.playerName;
+
+  pinInput.value = '';
+  pinError.classList.add('hidden');
+  pinError.textContent = '';
+
+  if (state.session.hasPin) {
+    notSetNotice.classList.add('hidden');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = state.activeTradeType === 'BUY' ? 'Konfirmasi & Beli' : 'Konfirmasi & Jual';
+    confirmBtn.className = state.activeTradeType === 'BUY'
+      ? 'flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20'
+      : 'flex-1 py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-red-500/20';
+  } else {
+    notSetNotice.classList.remove('hidden');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Masukkan PIN 6-Digit';
+  }
+
+  pinModal.classList.remove('hidden');
+  pinModal.classList.add('flex');
+  setTimeout(() => pinInput.focus(), 150);
 }
 
-function showSessionTerminatedModal(reason) {
-  const modal = document.getElementById('session-terminated-modal');
-  const reasonText = document.getElementById('terminated-reason-text');
-  if (reasonText) reasonText.textContent = reason;
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+function closePinModal() {
+  const pinModal = document.getElementById('pin-modal');
+  if (pinModal) {
+    pinModal.classList.add('hidden');
+    pinModal.classList.remove('flex');
   }
+  state.pendingTrade = null;
+}
+
+async function handlePinSubmit(e) {
+  e.preventDefault();
+  const pinInput = document.getElementById('pin-input');
+  const pin = pinInput.value.trim();
+  const pinError = document.getElementById('pin-error-msg');
+  const pinCard = document.getElementById('pin-modal-card');
+  const confirmBtn = document.getElementById('pin-confirm-btn');
+
+  if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+    pinError.textContent = 'PIN harus terdiri dari tepat 6 angka numerik (0-9).';
+    pinError.classList.remove('hidden');
+    pinCard.classList.add('animate-shake');
+    setTimeout(() => pinCard.classList.remove('animate-shake'), 400);
+    return;
+  }
+
+  if (!state.pendingTrade) {
+    closePinModal();
+    return;
+  }
+
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Memverifikasi...';
+
+  try {
+    const res = await fetch('/api/trading/trade', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        pin: pin,
+        trade_type: state.pendingTrade.tradeType,
+        asset: state.pendingTrade.assetSymbol,
+        amount: state.pendingTrade.amount,
+        price: state.pendingTrade.price
+      })
+    });
+
+    const json = await res.json();
+
+    if (json.success && json.data) {
+      // Trade Success
+      state.session.cashBalance = json.data.new_balance;
+      state.session.hasPin = true;
+
+      // Update portfolios
+      if (json.data.portfolio) {
+        Object.keys(json.data.portfolio).forEach(k => {
+          if (state.portfolio[k]) {
+            state.portfolio[k].amount = json.data.portfolio[k][0] || 0;
+            state.portfolio[k].avgBuyPrice = json.data.portfolio[k][1] || 0;
+          }
+        });
+      }
+
+      // Add trade log
+      if (json.data.trade) {
+        const t = json.data.trade;
+        const now = new Date();
+        state.tradeLogs.unshift({
+          time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
+          type: t.trade_type,
+          asset: t.asset,
+          amount: t.amount,
+          price: t.price,
+          total: t.total
+        });
+      }
+
+      closePinModal();
+      startAntiWhaleCooldown();
+      updateUserProfileUI();
+      renderPortfolioTable();
+      renderTradeHistory();
+
+      // Clear input
+      document.getElementById('trade-amount-input').value = '';
+      calculateTradeCost();
+
+      showToast(json.message || 'Transaksi berhasil dieksekusi!', 'success');
+
+    } else {
+      // Error
+      pinCard.classList.add('animate-shake');
+      setTimeout(() => pinCard.classList.remove('animate-shake'), 400);
+
+      pinError.textContent = json.message || 'PIN salah atau transaksi gagal.';
+      pinError.classList.remove('hidden');
+
+      if (json.error_code === 'PIN_NOT_SET') {
+        document.getElementById('pin-not-set-notice').classList.remove('hidden');
+      }
+    }
+  } catch (err) {
+    console.error('Trade error:', err);
+    pinError.textContent = 'Terjadi kesalahan komunikasi dengan server.';
+    pinError.classList.remove('hidden');
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Konfirmasi Transaksi';
+  }
+}
+
+function startAntiWhaleCooldown() {
+  state.cooldownActive = true;
+  state.cooldownRemaining = 5;
+
+  const indicator = document.getElementById('cooldown-indicator');
+  const timerText = document.getElementById('cooldown-seconds');
+  const submitBtn = document.getElementById('trade-submit-btn');
+
+  if (indicator) indicator.classList.remove('hidden');
+  if (submitBtn) submitBtn.disabled = true;
+
+  if (cooldownTimer) clearInterval(cooldownTimer);
+  cooldownTimer = setInterval(() => {
+    state.cooldownRemaining--;
+    if (timerText) timerText.textContent = `${state.cooldownRemaining}s`;
+
+    if (state.cooldownRemaining <= 0) {
+      clearInterval(cooldownTimer);
+      state.cooldownActive = false;
+      if (indicator) indicator.classList.add('hidden');
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }, 1000);
 }
 
 // =======================================================
@@ -464,7 +702,6 @@ function setTimeframe(tf) {
   event.target.classList.add('bg-primary', 'text-white', 'font-bold', 'active');
   event.target.classList.remove('text-neutral-400');
 
-  // Regenerate history points based on timeframe
   const asset = state.assets[state.activeAsset];
   const count = tf === '1M' ? 12 : tf === '5M' ? 10 : tf === '15M' ? 8 : tf === '1H' ? 6 : 5;
   const base = asset.price;
@@ -477,7 +714,7 @@ function setTimeframe(tf) {
 }
 
 // =======================================================
-//   ORDER EXECUTION & CALCULATIONS
+//   ORDER CALCULATIONS & FORM SHORTCUTS
 // =======================================================
 function setTradeType(type) {
   state.activeTradeType = type;
@@ -506,14 +743,19 @@ function setTradeType(type) {
 }
 
 function updateBalanceDisplays() {
-  document.getElementById('player-cash-display').textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const cashDisplay = document.getElementById('player-cash-display');
+  if (cashDisplay) {
+    cashDisplay.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  }
   
   const formBal = document.getElementById('form-available-balance');
-  if (state.activeTradeType === 'BUY') {
-    formBal.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  } else {
-    const owned = state.portfolio[state.activeAsset]?.amount || 0;
-    formBal.textContent = `${owned.toFixed(2)} ${state.assets[state.activeAsset].symbol}`;
+  if (formBal) {
+    if (state.activeTradeType === 'BUY') {
+      formBal.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    } else {
+      const owned = state.portfolio[state.activeAsset]?.amount || 0;
+      formBal.textContent = `${owned.toFixed(2)} ${state.assets[state.activeAsset].symbol}`;
+    }
   }
 }
 
@@ -523,7 +765,7 @@ function setPercentageAmount(pct) {
 
   if (state.activeTradeType === 'BUY') {
     const totalCash = state.session.cashBalance;
-    const maxBuyAmount = totalCash / (asset.price * 1.02); // accounting for 2% tax
+    const maxBuyAmount = totalCash / (asset.price * 1.02); // 2% tax
     const amount = Math.floor(maxBuyAmount * pct * 100) / 100;
     input.value = Math.min(amount, 1000) > 0 ? Math.min(amount, 1000) : '';
   } else {
@@ -547,137 +789,6 @@ function calculateTradeCost() {
   document.getElementById('summary-subtotal').textContent = `$${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   document.getElementById('summary-tax').textContent = `$${tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   document.getElementById('summary-total').textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-}
-
-function handleTradeSubmit(e) {
-  e.preventDefault();
-
-  if (state.cooldownActive) {
-    showToast(`Tunggu Anti-Whale cooldown selesai (${state.cooldownRemaining}s)!`, 'danger');
-    return;
-  }
-
-  const input = document.getElementById('trade-amount-input');
-  const amount = parseFloat(input.value);
-  const assetKey = state.activeAsset;
-  const asset = state.assets[assetKey];
-
-  if (!amount || amount <= 0) {
-    showToast('Masukkan jumlah unit transaksi yang valid!', 'danger');
-    return;
-  }
-
-  if (amount > 1000) {
-    showToast('Maksimal order 1,000 unit per transaksi!', 'danger');
-    return;
-  }
-
-  const subtotal = amount * asset.price;
-  const tax = subtotal * 0.02;
-
-  if (state.activeTradeType === 'BUY') {
-    const totalCost = subtotal + tax;
-    if (state.session.cashBalance < totalCost) {
-      showToast('Saldo kas Vault tidak mencukupi untuk order ini!', 'danger');
-      return;
-    }
-
-    // Execute via WS or Demo Mode
-    if (state.session.isDemo) {
-      state.session.cashBalance -= totalCost;
-      const prevAmount = state.portfolio[assetKey].amount;
-      const prevAvg = state.portfolio[assetKey].avgBuyPrice;
-      const newAmount = prevAmount + amount;
-      const newAvg = ((prevAmount * prevAvg) + (amount * asset.price)) / newAmount;
-
-      state.portfolio[assetKey].amount = newAmount;
-      state.portfolio[assetKey].avgBuyPrice = newAvg;
-
-      recordTradeLog('BUY', assetKey, amount, asset.price, totalCost);
-      updateBalanceDisplays();
-      renderPortfolioTable();
-      startAntiWhaleCooldown();
-      input.value = '';
-      calculateTradeCost();
-      showToast(`✅ [DEMO] Berhasil membeli ${amount} ${asset.symbol}!`, 'success');
-    } else if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-      wsClient.send(JSON.stringify({
-        type: 'TRADE_EXECUTE',
-        tradeType: 'BUY',
-        asset: asset.symbol,
-        amount: amount,
-        price: asset.price,
-        totalCost: totalCost
-      }));
-      startAntiWhaleCooldown();
-      input.value = '';
-      calculateTradeCost();
-    } else {
-      showToast('Gagal terhubung ke WebSocket Server.', 'danger');
-    }
-
-  } else {
-    // SELL
-    const owned = state.portfolio[assetKey]?.amount || 0;
-    if (owned < amount) {
-      showToast(`Kamu hanya memiliki ${owned.toFixed(2)} ${asset.symbol}!`, 'danger');
-      return;
-    }
-
-    const netPayout = subtotal - tax;
-
-    if (state.session.isDemo) {
-      state.session.cashBalance += netPayout;
-      state.portfolio[assetKey].amount -= amount;
-
-      recordTradeLog('SELL', assetKey, amount, asset.price, netPayout);
-      updateBalanceDisplays();
-      renderPortfolioTable();
-      startAntiWhaleCooldown();
-      input.value = '';
-      calculateTradeCost();
-      showToast(`🔴 [DEMO] Berhasil menjual ${amount} ${asset.symbol}!`, 'success');
-    } else if (wsClient && wsClient.readyState === WebSocket.OPEN) {
-      wsClient.send(JSON.stringify({
-        type: 'TRADE_EXECUTE',
-        tradeType: 'SELL',
-        asset: asset.symbol,
-        amount: amount,
-        price: asset.price,
-        netPayout: netPayout
-      }));
-      startAntiWhaleCooldown();
-      input.value = '';
-      calculateTradeCost();
-    } else {
-      showToast('Gagal terhubung ke WebSocket Server.', 'danger');
-    }
-  }
-}
-
-function startAntiWhaleCooldown() {
-  state.cooldownActive = true;
-  state.cooldownRemaining = 5;
-
-  const indicator = document.getElementById('cooldown-indicator');
-  const timerText = document.getElementById('cooldown-seconds');
-  const submitBtn = document.getElementById('trade-submit-btn');
-
-  if (indicator) indicator.classList.remove('hidden');
-  if (submitBtn) submitBtn.disabled = true;
-
-  if (cooldownTimer) clearInterval(cooldownTimer);
-  cooldownTimer = setInterval(() => {
-    state.cooldownRemaining--;
-    if (timerText) timerText.textContent = `${state.cooldownRemaining}s`;
-
-    if (state.cooldownRemaining <= 0) {
-      clearInterval(cooldownTimer);
-      state.cooldownActive = false;
-      if (indicator) indicator.classList.add('hidden');
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  }, 1000);
 }
 
 // =======================================================
@@ -752,28 +863,12 @@ function renderPortfolioTable() {
   tbody.innerHTML = rows.join('');
 }
 
-function recordTradeLog(type, assetKey, amount, price, total) {
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-  
-  state.tradeLogs.unshift({
-    time: timeStr,
-    type,
-    asset: state.assets[assetKey].symbol,
-    amount,
-    price,
-    total
-  });
-
-  renderTradeHistory();
-}
-
 function renderTradeHistory() {
   const container = document.getElementById('trade-history-list');
   if (!container) return;
 
   if (state.tradeLogs.length === 0) {
-    container.innerHTML = `<div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada sesi ini.</div>`;
+    container.innerHTML = `<div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada akun ini.</div>`;
     return;
   }
 
@@ -833,15 +928,6 @@ function simulateMicroPriceMovements() {
   updateActiveAssetDisplay();
   updateChartData();
   renderOrderbook();
-}
-
-function updateTickerHeadline(headline, asset, change) {
-  const ticker = document.getElementById('news-ticker');
-  if (!ticker) return;
-  const item = document.createElement('span');
-  item.className = 'mx-6 text-primary font-bold';
-  item.textContent = `🔥 BREAKING: ${headline} (${asset} ${change > 0 ? '+' : ''}${change}%)`;
-  ticker.prepend(item);
 }
 
 // =======================================================

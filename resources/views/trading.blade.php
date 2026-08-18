@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GenzSMP Trading Terminal — Portal Investasi Crypto & Komoditas In-Game</title>
-    <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung secara real-time dua arah dengan akun Minecraft dan Vault Economy." />
+    <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung dengan akun Minecraft, Vault Economy, dan PIN Keamanan 6-Digit." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
     <!-- Google Fonts -->
@@ -83,14 +83,6 @@
         text-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
       }
 
-      .text-glow-green {
-        text-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
-      }
-
-      .text-glow-red {
-        text-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
-      }
-
       /* Ticker animation */
       @keyframes tickerSlide {
         0% { transform: translateX(0); }
@@ -107,22 +99,14 @@
         animation-play-state: paused;
       }
 
-      /* Pulse Ring Animation */
-      .pulse-ring {
-        position: relative;
+      /* Shake animation for invalid PIN */
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-6px); }
+        40%, 80% { transform: translateX(6px); }
       }
-      .pulse-ring::before {
-        content: '';
-        position: absolute;
-        inset: -4px;
-        border-radius: inherit;
-        background: inherit;
-        opacity: 0.4;
-        animation: pulseRing 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
-      }
-      @keyframes pulseRing {
-        0% { transform: scale(0.95); opacity: 0.6; }
-        100% { transform: scale(1.6); opacity: 0; }
+      .animate-shake {
+        animation: shake 0.4s ease-in-out;
       }
     </style>
   </head>
@@ -155,7 +139,7 @@
             </div>
           </a>
 
-          <!-- Quick Navigation Link back to portal -->
+          <!-- Quick Navigation Links -->
           <nav class="hidden md:flex items-center gap-2 border-l border-neutral-800 pl-6">
             <a href="{{ route('home') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-900 transition">
               Portal Home
@@ -169,30 +153,48 @@
           </nav>
         </div>
 
-        <!-- Right Header: Player Vault Balance & Session Indicator -->
+        <!-- Right Header: Player Vault Balance & Profile Controls -->
         <div class="flex items-center gap-3">
-          <!-- Live WebSocket Status Indicator -->
-          <div id="ws-status-badge" class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold bg-neutral-900 border border-neutral-800">
-            <span id="ws-status-dot" class="h-2 w-2 rounded-full bg-yellow-400 animate-pulse"></span>
-            <span id="ws-status-text" class="text-neutral-300">Menghubungkan...</span>
+          
+          <!-- Player Account Info Card (Logged In) -->
+          <div id="player-profile-bar" class="hidden items-center gap-3 bg-neutral-950/80 border border-purple-500/20 rounded-2xl px-4 py-2 shadow-inner">
+            <div class="flex items-center gap-2">
+              <div class="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-purple-600 p-0.5 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                <i data-lucide="user" class="h-4 w-4"></i>
+              </div>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-1.5">
+                  <span id="player-name-display" class="font-bold text-xs text-white">Player</span>
+                  <span id="player-bedrock-badge" class="hidden px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    BEDROCK
+                  </span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span id="player-cash-display" class="font-mono text-xs font-black text-emerald-400">$0.00</span>
+                  <span id="pin-status-badge" class="text-[9px] font-mono text-neutral-500">● PIN: -</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Switch / Logout Button -->
+            <button 
+              onclick="openLoginModal()" 
+              title="Ganti Akun Minecraft"
+              class="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition text-xs"
+            >
+              <i data-lucide="log-out" class="h-3.5 w-3.5"></i>
+            </button>
           </div>
 
-          <!-- Player Account Info Card -->
-          <div class="flex items-center gap-3 bg-neutral-950/80 border border-purple-500/20 rounded-2xl px-4 py-2 shadow-inner">
-            <div class="h-8 w-8 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary shrink-0">
-              <i data-lucide="wallet" class="h-4 w-4"></i>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-[10px] uppercase font-bold text-neutral-400">Vault Balance (Cash)</span>
-              <span id="player-cash-display" class="font-mono text-sm font-black text-emerald-400">$0.00</span>
-            </div>
-          </div>
+          <!-- Login Button (If Logged Out) -->
+          <button 
+            id="login-trigger-btn"
+            onclick="openLoginModal()"
+            class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-purple-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/20 hover:brightness-110 active:scale-95 transition cursor-pointer"
+          >
+            <i data-lucide="log-in" class="h-4 w-4"></i> Masuk Akun
+          </button>
 
-          <!-- Session Countdown Badge -->
-          <div class="hidden lg:flex flex-col items-end bg-neutral-950/80 border border-neutral-800 rounded-2xl px-3.5 py-2">
-            <span class="text-[10px] uppercase font-bold text-neutral-500">Sesi Berlaku</span>
-            <span id="session-timer-display" class="font-mono text-xs font-bold text-primary">15:00</span>
-          </div>
         </div>
       </header>
 
@@ -206,9 +208,10 @@
           <div id="news-ticker" class="animate-ticker text-neutral-300">
             <span class="mx-6">🚀 BTC Market Bullish: Sentimen positif mendorong kenaikan harga +4.2%</span>
             <span class="mx-6">💎 Diamond Mining Spike: Pasokan DIA stabil di level $245</span>
+            <span class="mx-6">🔐 Sistem PIN Keamanan: Transaksi Buy/Sell di web dijamin aman dengan 6-digit PIN in-game</span>
             <span class="mx-6">⚡ ETH Smart Economy: Likuiditas likuid di pasar in-game GenzSMP</span>
             <span class="mx-6">👑 Protokol Transaksi: 2% burn tax diterapkan otomatis pada setiap penjualan</span>
-            <span class="mx-6">🛡️ Anti-Whale Engine: Rate-limit 5 detik melindungi volatilitas likuiditas</span>
+            <span class="mx-6">🛡️ Anti-Whale Engine: Rate-limit 5 detik melindungi stabilitas likuiditas</span>
           </div>
         </div>
       </div>
@@ -233,28 +236,19 @@
             </div>
           </div>
 
-          <!-- Market Summary Widget -->
+          <!-- PIN Info & Security Guide Card -->
           <div class="glass-panel rounded-2xl p-4 space-y-3">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-2">
-              <i data-lucide="activity" class="h-4 w-4 text-primary"></i> Info Protokol Finansial
+            <h3 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+              <i data-lucide="shield-check" class="h-4 w-4"></i> Panduan PIN Keamanan 6-Digit
             </h3>
-            <div class="space-y-2 text-xs font-mono">
-              <div class="flex justify-between py-1 border-b border-neutral-900">
-                <span class="text-neutral-500">Protocol Tax</span>
-                <span class="text-white font-bold">2.0% (Burn)</span>
-              </div>
-              <div class="flex justify-between py-1 border-b border-neutral-900">
-                <span class="text-neutral-500">Anti-Whale Cooldown</span>
-                <span class="text-primary font-bold">5 Detik</span>
-              </div>
-              <div class="flex justify-between py-1 border-b border-neutral-900">
-                <span class="text-neutral-500">Max Order Limit</span>
-                <span class="text-white font-bold">1,000 Unit</span>
-              </div>
-              <div class="flex justify-between py-1">
-                <span class="text-neutral-500">Engine Sinkronisasi</span>
-                <span class="text-emerald-400 font-bold">HikariCP + Vault</span>
-              </div>
+            <p class="text-[11px] text-neutral-400 leading-relaxed">
+              Untuk melindungi akun Anda dari transaksi liar, eksekusi Buy & Sell di web mewajibkan memasukkan 6-digit PIN in-game.
+            </p>
+            <div class="bg-neutral-950 p-3 rounded-xl border border-neutral-900 text-xs font-mono space-y-1">
+              <div class="text-primary font-bold">/invest setpin &lt;6-digit&gt;</div>
+              <div class="text-[10px] text-neutral-500">Atur PIN baru (Contoh: /invest setpin 123456)</div>
+              <div class="text-primary font-bold pt-1">/invest changepin &lt;old&gt; &lt;new&gt;</div>
+              <div class="text-[10px] text-neutral-500">Ganti PIN keamanan lama</div>
             </div>
           </div>
         </div>
@@ -293,7 +287,7 @@
               </div>
             </div>
 
-            <!-- Timeframe & Chart Type Controls -->
+            <!-- Timeframe Controls & Mini Stats -->
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
                 <button onclick="setTimeframe('1M')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1M</button>
@@ -303,7 +297,6 @@
                 <button onclick="setTimeframe('1D')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
               </div>
 
-              <!-- High / Low / Volume Mini Stats -->
               <div class="flex items-center gap-4 text-xs font-mono text-neutral-400">
                 <div>24h High: <span id="stat-high" class="text-white font-bold">$1,080</span></div>
                 <div>24h Low: <span id="stat-low" class="text-white font-bold">$950</span></div>
@@ -317,7 +310,7 @@
             </div>
           </div>
 
-          <!-- Bottom Tabs: Orderbook & Portfolio & Logs -->
+          <!-- Bottom Tabs: Portfolio & Orderbook & Logs -->
           <div class="glass-panel rounded-2xl p-5 space-y-4">
             <div class="flex items-center justify-between border-b border-neutral-800/80 pb-3">
               <div class="flex gap-2">
@@ -355,7 +348,6 @@
 
             <!-- Tab Content 2: Orderbook (Bids / Asks) -->
             <div id="tab-content-orderbook" class="hidden grid grid-cols-2 gap-4 text-xs font-mono">
-              <!-- Bids (Buy Orders) -->
               <div class="space-y-2">
                 <div class="flex justify-between text-neutral-500 font-sans uppercase font-bold text-[10px] pb-1 border-b border-neutral-900">
                   <span class="text-emerald-400">BIDS (BELI)</span>
@@ -364,7 +356,6 @@
                 <div id="orderbook-bids" class="space-y-1"></div>
               </div>
 
-              <!-- Asks (Sell Orders) -->
               <div class="space-y-2">
                 <div class="flex justify-between text-neutral-500 font-sans uppercase font-bold text-[10px] pb-1 border-b border-neutral-900">
                   <span class="text-red-400">ASKS (JUAL)</span>
@@ -408,25 +399,12 @@
             </div>
 
             <!-- Trade Form -->
-            <form id="trade-form" onsubmit="handleTradeSubmit(event)" class="space-y-4">
+            <form id="trade-form" onsubmit="promptPinModal(event)" class="space-y-4">
               
               <!-- Available Balance / Holdings Counter -->
               <div class="flex items-center justify-between text-xs font-mono">
-                <span class="text-neutral-400" id="balance-label">Saldo Kas:</span>
+                <span class="text-neutral-400" id="balance-label">Saldo Kas Vault:</span>
                 <span id="form-available-balance" class="text-primary font-bold">$0.00</span>
-              </div>
-
-              <!-- Order Type Selector -->
-              <div class="space-y-1.5">
-                <label class="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Tipe Order</label>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                  <button type="button" class="py-2 rounded-xl bg-purple-500/10 text-primary border border-purple-500/30 font-bold">
-                    Market (Instan)
-                  </button>
-                  <button type="button" disabled class="py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-500 opacity-50 cursor-not-allowed">
-                    Limit (Segera)
-                  </button>
-                </div>
               </div>
 
               <!-- Quantity Input -->
@@ -486,7 +464,7 @@
                 id="trade-submit-btn" 
                 class="w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-xl shadow-emerald-500/20 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2"
               >
-                <i data-lucide="arrow-right-left" class="h-4 w-4"></i>
+                <i data-lucide="lock" class="h-4 w-4"></i>
                 <span id="trade-btn-text">Eksekusi Order Beli (BUY)</span>
               </button>
             </form>
@@ -502,86 +480,135 @@
 
       </main>
 
-      <!-- ACCESS DENIED FULLSCREEN OVERLAY (Shown if no token/player provided) -->
-      <div id="access-denied-modal" class="{{ $isValidAccess ? 'hidden' : 'flex' }} fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-        <div class="glass-panel max-w-lg w-full rounded-3xl p-8 border border-purple-500/20 text-center space-y-6 shadow-2xl relative overflow-hidden">
-          <div class="absolute -top-24 -left-24 h-48 w-48 rounded-full bg-purple-600/20 blur-3xl"></div>
-          
-          <div class="mx-auto h-20 w-20 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary shadow-xl">
-            <i data-lucide="shield-alert" class="h-10 w-10"></i>
+      <!-- ========================================================= -->
+      <!-- MODAL 1: LOGIN / USERNAME PROMPT MODAL                    -->
+      <!-- ========================================================= -->
+      <div id="login-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-7 border border-purple-500/30 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          <div class="absolute -top-20 -left-20 h-40 w-40 rounded-full bg-purple-600/20 blur-3xl"></div>
+
+          <div class="mx-auto h-16 w-16 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary shadow-xl">
+            <i data-lucide="user-check" class="h-8 w-8"></i>
           </div>
 
-          <div class="space-y-2">
-            <span class="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20">
-              Zero-Trust Security
+          <div class="space-y-1.5">
+            <span class="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-primary border border-purple-500/20">
+              Autentikasi Akun Minecraft
             </span>
-            <h2 class="font-display text-2xl font-black text-white uppercase">Akses Trading Terkunci</h2>
-            <p class="text-xs text-neutral-400 leading-relaxed">
-              Portal Trading GenzSMP menggunakan enkripsi Zero-Trust session token yang hanya dapat digenerate secara langsung dari dalam in-game Minecraft.
+            <h2 class="font-display text-2xl font-black text-white uppercase">Masuk Terminal</h2>
+            <p class="text-xs text-neutral-400">
+              Masukkan Gamertag Minecraft Anda (Gunakan awalan <strong class="text-cyan-400">.</strong> untuk Bedrock Edition, contoh: <code class="text-white">.SteveGenz</code>).
             </p>
           </div>
 
-          <!-- Walkthrough Box -->
-          <div class="text-left bg-neutral-950/80 border border-neutral-900 rounded-2xl p-4 space-y-3 text-xs">
-            <h4 class="font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <i data-lucide="terminal" class="h-4 w-4 text-primary"></i> Cara Membuka Sesi Trading:
-            </h4>
-            <ol class="space-y-2 text-neutral-300">
-              <li class="flex items-start gap-2.5">
-                <span class="h-5 w-5 rounded bg-purple-500/20 text-primary text-[10px] font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
-                <span>Masuk ke server Minecraft: <strong class="text-white font-mono">genzsmp.site</strong></span>
-              </li>
-              <li class="flex items-start gap-2.5">
-                <span class="h-5 w-5 rounded bg-purple-500/20 text-primary text-[10px] font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
-                <span>Ketik perintah di chat in-game: <strong class="text-primary font-mono font-bold">/invest web</strong></span>
-              </li>
-              <li class="flex items-start gap-2.5">
-                <span class="h-5 w-5 rounded bg-purple-500/20 text-primary text-[10px] font-mono font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
-                <span>Klik link aman yang dikirimkan oleh server di chat in-game untuk login otomatis.</span>
-              </li>
-            </ol>
-          </div>
+          <form onsubmit="handleLoginSubmit(event)" class="space-y-4 text-left">
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Username / Gamertag</label>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  id="login-username-input" 
+                  placeholder="Contoh: SteveGenz atau .SteveGenz" 
+                  required
+                  class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3.5 text-white font-mono text-sm focus:outline-none placeholder-neutral-600"
+                />
+              </div>
+            </div>
 
-          <!-- Action Buttons -->
-          <div class="flex flex-col sm:flex-row gap-3 pt-2">
             <button 
-              onclick="startDemoMode()" 
-              class="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+              type="submit" 
+              id="login-submit-btn"
+              class="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-purple-500/20"
             >
-              Jelajahi Mode Demo (Preview)
+              Masuk & Buka Portofolio
             </button>
-            <a 
-              href="{{ route('home') }}" 
-              class="flex-1 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white font-bold text-xs uppercase tracking-wider transition text-center"
-            >
-              Kembali ke Home
-            </a>
+          </form>
+
+          <div class="pt-2 border-t border-neutral-900 flex justify-between items-center text-xs text-neutral-500">
+            <span>Server: <strong class="text-white font-mono">genzsmp.site</strong></span>
+            <button onclick="closeLoginModal()" class="hover:text-white transition">Tutup</button>
           </div>
         </div>
       </div>
 
-      <!-- SESSION TERMINATED OVERLAY -->
-      <div id="session-terminated-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-        <div class="glass-panel max-w-md w-full rounded-3xl p-8 border border-red-500/20 text-center space-y-6 shadow-2xl">
-          <div class="mx-auto h-20 w-20 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
-            <i data-lucide="lock" class="h-10 w-10"></i>
+      <!-- ========================================================= -->
+      <!-- MODAL 2: 6-DIGIT PIN SECURITY MODAL (REQUIRED FOR TRADE)  -->
+      <!-- ========================================================= -->
+      <div id="pin-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+        <div id="pin-modal-card" class="glass-panel max-w-md w-full rounded-3xl p-7 border border-purple-500/30 text-center space-y-5 shadow-2xl relative overflow-hidden">
+          <div class="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-purple-600/20 blur-3xl"></div>
+
+          <div class="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-purple-700 p-0.5 shadow-xl flex items-center justify-center text-white">
+            <i data-lucide="key-round" class="h-8 w-8"></i>
           </div>
 
-          <div class="space-y-2">
-            <h2 class="font-display text-2xl font-black text-white uppercase">Sesi Trading Berakhir</h2>
-            <p id="terminated-reason-text" class="text-xs text-neutral-400 leading-relaxed">
-              Sesi web trading telah ditutup oleh server in-game atau waktu sesi (15 menit) telah habis.
+          <div class="space-y-1">
+            <span class="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              Verifikasi Transaksi
+            </span>
+            <h3 class="font-display text-xl font-black text-white uppercase">Masukkan 6-Digit PIN Trading</h3>
+            <p id="pin-modal-desc" class="text-xs text-neutral-400">
+              Konfirmasi eksekusi order <span id="pin-summary-action" class="font-bold text-white">BUY 1.00 BTC</span>
             </p>
           </div>
 
-          <div class="flex gap-3">
-            <a 
-              href="{{ route('home') }}" 
-              class="w-full py-3.5 rounded-xl bg-primary hover:bg-purple-600 text-white font-bold text-xs uppercase tracking-wider transition"
-            >
-              Kembali ke Web Portal
-            </a>
+          <!-- Transaction Mini Summary Box -->
+          <div class="bg-neutral-950 p-3 rounded-2xl border border-neutral-900 text-xs font-mono flex justify-between items-center">
+            <div>
+              <div class="text-[10px] text-neutral-500 uppercase">Total Transaksi</div>
+              <div id="pin-summary-total" class="font-bold text-primary text-sm">$1,040.40</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-neutral-500 uppercase">Akun</div>
+              <div id="pin-summary-player" class="font-bold text-white">SteveGenz</div>
+            </div>
           </div>
+
+          <!-- PIN Input Form -->
+          <form onsubmit="handlePinSubmit(event)" class="space-y-4">
+            <div class="space-y-2">
+              <label class="text-[11px] font-bold uppercase tracking-wider text-neutral-400">PIN Keamanan (6 Angka)</label>
+              <input 
+                type="password" 
+                id="pin-input" 
+                maxlength="6" 
+                pattern="[0-9]{6}" 
+                inputmode="numeric" 
+                placeholder="● ● ● ● ● ●" 
+                required 
+                autofocus
+                class="w-full text-center tracking-[0.75em] bg-neutral-900 border border-neutral-800 focus:border-primary rounded-2xl py-3.5 text-white font-mono text-xl font-bold focus:outline-none"
+              />
+              <p id="pin-error-msg" class="hidden text-xs text-red-400 font-medium"></p>
+            </div>
+
+            <!-- Notice if PIN is not set -->
+            <div id="pin-not-set-notice" class="hidden text-left p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs space-y-1">
+              <div class="font-bold flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="h-4 w-4"></i> PIN Belum Diatur di In-Game!
+              </div>
+              <p class="text-[11px] text-neutral-300">
+                Silakan masuk ke server Minecraft dan ketik: <code class="text-primary font-bold font-mono">/invest setpin &lt;6-digit&gt;</code> (Contoh: <code class="text-white font-mono">/invest setpin 123456</code>).
+              </p>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+              <button 
+                type="button" 
+                onclick="closePinModal()" 
+                class="flex-1 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white font-bold text-xs uppercase tracking-wider transition"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit" 
+                id="pin-confirm-btn"
+                class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20"
+              >
+                Konfirmasi & Beli
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -590,7 +617,7 @@
 
     </div>
 
-    <!-- Inject Server & Trading Configuration -->
+    <!-- Inject Initial Config -->
     <script>
       window.TRADING_CONFIG = {
         token: "{{ $token }}",
