@@ -50,14 +50,15 @@ class MinecraftRconService
                 ];
             }
 
-            $response = $rcon->sendCommand($command);
+            $sent = $rcon->sendCommand($command);
+            $response = $rcon->getResponse() ?? '';
             $rcon->disconnect();
 
             return [
-                'success' => true,
+                'success' => $sent,
                 'command' => $command,
                 'response' => $this->cleanResponse($response),
-                'error' => null
+                'error' => $sent ? null : 'Failed to send command to server'
             ];
         } catch (\Throwable $e) {
             Log::error("Minecraft RCON Exception [Cmd: {$command}]: " . $e->getMessage());
