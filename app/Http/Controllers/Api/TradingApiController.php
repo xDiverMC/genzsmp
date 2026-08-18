@@ -6,12 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Models\InvestPortfolio;
 use App\Models\InvestTrade;
 use App\Models\InvestUser;
+use App\Services\MinecraftRconService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class TradingApiController extends Controller
 {
+    protected MinecraftRconService $rconService;
+
+    public function __construct(MinecraftRconService $rconService)
+    {
+        $this->rconService = $rconService;
+    }
     /**
      * Login or get player account details by username.
      *
@@ -182,6 +189,7 @@ class TradingApiController extends Controller
         }
 
         // 4. Record in trade history
+        $finalTotal = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
         $trade = InvestTrade::create([
             'player_name' => $playerName,
             'trade_type' => $tradeType,
@@ -190,7 +198,7 @@ class TradingApiController extends Controller
             'price' => $spotPrice,
             'subtotal' => $subtotal,
             'tax' => $tax,
-            'total' => ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax)
+            'total' => $finalTotal
         ]);
 
         // Load fresh portfolios
@@ -199,6 +207,22 @@ class TradingApiController extends Controller
         })->map(function ($item) {
             return [$item->amount, $item->avg_buy_price];
         });
+
+        // 5. Notify player in-game if online via RCON
+        try {
+            $this->rconService->notifyTradeInGame(
+                $playerName,
+                $tradeType,
+                $assetSymbol,
+                $amount,
+                $spotPrice,
+                $tax,
+                $finalTotal,
+                (float) $user->cash_balance
+            );
+        } catch (\Throwable $e) {
+            // Player may be offline or RCON unreachable; non-blocking
+        }
 
         return response()->json([
             'success' => true,
