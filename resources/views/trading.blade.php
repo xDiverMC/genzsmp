@@ -515,6 +515,15 @@
               </div>
             </div>
 
+            <!-- Login Error Notice -->
+            <div id="login-error-msg" class="hidden p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed space-y-1">
+              <div class="font-bold flex items-center gap-1.5 text-red-400">
+                <i data-lucide="alert-circle" class="h-4 w-4 shrink-0"></i>
+                <span id="login-error-title">Akun Belum Terdaftar!</span>
+              </div>
+              <p id="login-error-text" class="text-[11px] text-neutral-300"></p>
+            </div>
+
             <button 
               type="submit" 
               id="login-submit-btn"

@@ -40,7 +40,17 @@ class TradingApiController extends Controller
         }
 
         $playerName = trim($request->input('player_name'));
-        $user = InvestUser::findOrCreateByName($playerName);
+        $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'USER_NOT_REGISTERED',
+                'message' => "Akun Gamertag '{$playerName}' belum terdaftar di sistem! Silakan login ke in-game server Minecraft (genzsmp.site) dan ketik: /invest setpin <6-digit> terlebih dahulu."
+            ], 404);
+        }
+
+        $user->update(['last_login_at' => now()]);
 
         // Load portfolios
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
@@ -50,7 +60,7 @@ class TradingApiController extends Controller
         });
 
         // Load recent trades
-        $recentTrades = InvestTrade::where('player_name', $playerName)
+        $recentTrades = InvestTrade::where('player_name', $user->player_name)
             ->latest()
             ->limit(20)
             ->get();

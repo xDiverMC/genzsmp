@@ -155,25 +155,39 @@ function closeLoginModal() {
 async function handleLoginSubmit(e) {
   e.preventDefault();
   const input = document.getElementById('login-username-input');
+  const errorBox = document.getElementById('login-error-msg');
+  const errorText = document.getElementById('login-error-text');
   const username = input.value.trim();
+
   if (!username) return;
+
+  if (errorBox) errorBox.classList.add('hidden');
 
   const btn = document.getElementById('login-submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Memuat Data Akun...';
+  btn.textContent = 'Memverifikasi Gamertag...';
 
   try {
-    await loginPlayer(username);
-    closeLoginModal();
+    const success = await loginPlayer(username, true);
+    if (success) {
+      closeLoginModal();
+    }
   } catch (err) {
-    showToast('Gagal memuat data akun Minecraft.', 'danger');
+    if (errorBox && errorText) {
+      errorText.textContent = 'Terjadi kesalahan saat menghubungkan ke server.';
+      errorBox.classList.remove('hidden');
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = 'Masuk & Buka Portofolio';
   }
 }
 
-async function loginPlayer(playerName) {
+async function loginPlayer(playerName, fromModal = false) {
+  const errorBox = document.getElementById('login-error-msg');
+  const errorText = document.getElementById('login-error-text');
+  const modal = document.getElementById('login-modal');
+
   try {
     const res = await fetch('/api/trading/login', {
       method: 'POST',
@@ -227,13 +241,41 @@ async function loginPlayer(playerName) {
       renderTradeHistory();
       calculateTradeCost();
 
-      showToast(`Selamat datang ${u.player_name}! Portofolio aktif.`, 'success');
+      if (fromModal) {
+        showToast(`Selamat datang ${u.player_name}! Portofolio aktif.`, 'success');
+      }
+      return true;
     } else {
-      showToast(json.message || 'Gagal login ke server.', 'danger');
+      // Login failed / Player not registered
+      if (errorBox && errorText) {
+        errorText.textContent = json.message || `Akun '${playerName}' belum terdaftar di sistem. Silakan atur PIN in-game via /invest setpin <6-digit> terlebih dahulu.`;
+        errorBox.classList.remove('hidden');
+      }
+
+      if (modal) {
+        modal.classList.add('animate-shake');
+        setTimeout(() => modal.classList.remove('animate-shake'), 400);
+      }
+
+      // If called from auto-load on start, open modal to inform user
+      if (!fromModal) {
+        openLoginModal();
+        if (errorBox && errorText) {
+          errorText.textContent = json.message || `Akun '${playerName}' belum terdaftar di sistem.`;
+          errorBox.classList.remove('hidden');
+        }
+      }
+
+      showToast(json.message || 'Akun tidak terdaftar!', 'danger');
+      return false;
     }
   } catch (err) {
     console.error('Error logging in:', err);
-    showToast('Terjadi kesalahan koneksi ke backend.', 'danger');
+    if (errorBox && errorText) {
+      errorText.textContent = 'Terjadi kesalahan koneksi ke backend.';
+      errorBox.classList.remove('hidden');
+    }
+    return false;
   }
 }
 
