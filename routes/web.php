@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\RconController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\TradingController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/trading', [TradingController::class, 'index'])->name('trading');
 
 // Admin Console Routes
 Route::prefix('admin/rcon')->name('admin.rcon.')->group(function () {

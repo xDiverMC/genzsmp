@@ -256,5 +256,70 @@ return [
         ['title' => 'Memanfaatkan Bug', 'description' => 'Sengaja memanfaatkan bug/glitch server untuk keuntungan pribadi.', 'severity' => 'Ban 1 Hari'],
         ['title' => 'Scam Arqoah', 'description' => 'Melakukan scam terkait transaksi Arqoah.', 'severity' => 'Ban 1 Hari'],
         ['title' => 'Kill Player', 'description' => 'Membunuh pemain lain di luar ketentuan yang diperbolehkan.', 'severity' => 'Ban 3 Hari']
+    ],
+
+    'trading' => [
+        'ws_port' => (int) env('ARQOINVEST_WS_PORT', 8088),
+        'ws_host' => env('ARQOINVEST_WS_HOST', '178.128.105.129'),
+        'tax_percent' => 2.0,
+        'cooldown_seconds' => 5,
+        'session_ttl_seconds' => 900,
+        'assets' => [
+            'btc' => [
+                'symbol' => 'BTC',
+                'name' => 'Bitcoin',
+                'category' => 'Crypto',
+                'icon' => 'Coins',
+                'color' => '#F7931A',
+                'initial_price' => 1020,
+                'min_price' => 500,
+                'max_price' => 100000,
+                'description' => 'Aset crypto terkemuka dengan kapitalisasi pasar terbesar di GenzSMP.'
+            ],
+            'eth' => [
+                'symbol' => 'ETH',
+                'name' => 'Ethereum',
+                'category' => 'Crypto',
+                'icon' => 'Zap',
+                'color' => '#627EEA',
+                'initial_price' => 510,
+                'min_price' => 250,
+                'max_price' => 50000,
+                'description' => 'Platform smart contract dan aset desentralisasi utilitas tinggi.'
+            ],
+            'gld' => [
+                'symbol' => 'GLD',
+                'name' => 'Gold Ingot',
+                'category' => 'Commodity',
+                'icon' => 'Shield',
+                'color' => '#FFD700',
+                'initial_price' => 105,
+                'min_price' => 50,
+                'max_price' => 5000,
+                'description' => 'Komoditas emas fisik stabil dengan risiko volatilitas rendah.'
+            ],
+            'dia' => [
+                'symbol' => 'DIA',
+                'name' => 'Diamond Gem',
+                'category' => 'Commodity',
+                'icon' => 'Gem',
+                'color' => '#00E5FF',
+                'initial_price' => 245,
+                'min_price' => 100,
+                'max_price' => 10000,
+                'description' => 'Aset permata berharga hasil tambang dalam dengan permintaan tinggi.'
+            ],
+            'emd' => [
+                'symbol' => 'EMD',
+                'name' => 'Emerald Shard',
+                'category' => 'Commodity',
+                'icon' => 'Sparkles',
+                'color' => '#00E676',
+                'initial_price' => 175,
+                'min_price' => 80,
+                'max_price' => 8000,
+                'description' => 'Mata uang barter villager dengan likuiditas tinggi di pasar global.'
+            ],
+        ]
     ]
 ];

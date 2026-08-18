@@ -655,25 +655,37 @@ const App = () => {
                   {link.label}
                 </a>
               ))}
+              <a
+                href="/trading"
+                className="rounded-lg px-3.5 py-2 text-xs font-bold uppercase tracking-wider text-purple-400 hover:text-white bg-purple-500/10 border border-purple-500/20 hover:bg-purple-600 transition-all flex items-center gap-1.5"
+              >
+                <Icon name="TrendingUp" className="h-3.5 w-3.5" /> Trading
+              </a>
             </div>
 
             {/* Discord & WhatsApp Group CTA */}
             <div className="hidden lg:flex items-center gap-2">
               <a
+                href="/trading"
+                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/20 hover:brightness-110 transition-all active:scale-95"
+              >
+                <Icon name="TrendingUp" className="h-4 w-4" /> Web Trading
+              </a>
+              <a
                 href={SERVER_INFO.discordUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-primary border border-purple-500/30 transition-all active:scale-95"
+                className="flex items-center gap-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-primary border border-purple-500/30 transition-all active:scale-95"
               >
-                <Icon name="MessageSquare" className="h-4 w-4 fill-primary" /> Join Discord
+                <Icon name="MessageSquare" className="h-4 w-4 fill-primary" /> Discord
               </a>
               <a
                 href={SERVER_INFO.whatsappGroupUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 transition-all active:scale-95"
+                className="flex items-center gap-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30 transition-all active:scale-95"
               >
-                <Icon name="Phone" className="h-4 w-4" /> Grup WhatsApp
+                <Icon name="Phone" className="h-4 w-4" /> WA Group
               </a>
             </div>
 
