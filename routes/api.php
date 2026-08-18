@@ -24,10 +24,3 @@ Route::prefix('trading')->group(function () {
     Route::post('/setpin', [TradingApiController::class, 'setPin']);
     Route::get('/user/{playerName}', [TradingApiController::class, 'getUserState']);
 });
-
-Route::prefix('rcon')->group(function () {
-    Route::post('/execute', [MinecraftController::class, 'executeRcon']);
-    Route::post('/give-rank', [MinecraftController::class, 'giveRank']);
-    Route::post('/give-money', [MinecraftController::class, 'giveMoney']);
-    Route::post('/give-item', [MinecraftController::class, 'giveItem']);
-});
