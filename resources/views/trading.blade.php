@@ -644,5 +644,8 @@
 
     <!-- Trading Controller Script -->
     <script src="{{ asset('js/trading.js') }}"></script>
+
+    <!-- Client-Side Security & Anti-Inspect Protection -->
+    <script src="{{ asset('js/security.js') }}"></script>
   </body>
 </html>

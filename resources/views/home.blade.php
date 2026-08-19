@@ -144,5 +144,8 @@
 
     <!-- React Application -->
     <script type="text/babel" src="{{ asset('js/app.js') }}"></script>
+
+    <!-- Client-Side Security & Anti-Inspect Protection -->
+    <script src="{{ asset('js/security.js') }}"></script>
   </body>
 </html>
