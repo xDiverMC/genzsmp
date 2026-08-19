@@ -2,10 +2,18 @@
 <html lang="id" class="bg-[#0f0f0f] text-neutral-200 selection:bg-purple-600 selection:text-white">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>GenzSMP Trading Terminal — Portal Investasi Crypto & Komoditas In-Game</title>
     <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung dengan akun Minecraft, Vault Economy, dan PIN Keamanan 6-Digit." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
+
+    <!-- PWA Manifest & App Metadata -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GenzTrade" />
+    <link rel="apple-touch-icon" href="{{ asset('images/logo.png') }}" />
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -186,6 +194,16 @@
             </button>
           </div>
 
+          <!-- PWA Install Button (Mobile & Desktop App) -->
+          <button 
+            id="pwa-install-btn" 
+            onclick="triggerPwaInstall()" 
+            class="hidden items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-emerald-500/10 cursor-pointer"
+          >
+            <i data-lucide="smartphone" class="h-3.5 w-3.5"></i>
+            <span>Install App</span>
+          </button>
+
           <!-- Login Button (If Logged Out) -->
           <button 
             id="login-trigger-btn"
@@ -323,6 +341,9 @@
                 <button onclick="switchBottomTab('history')" id="tab-btn-history" class="bottom-tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5">
                   <i data-lucide="history" class="h-3.5 w-3.5"></i> Riwayat Transaksi
                 </button>
+                <button onclick="switchBottomTab('leaderboard')" id="tab-btn-leaderboard" class="bottom-tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/10">
+                  <i data-lucide="trophy" class="h-3.5 w-3.5 text-amber-400"></i> Top Investor Hall of Fame
+                </button>
               </div>
             </div>
 
@@ -369,6 +390,68 @@
             <div id="tab-content-history" class="hidden space-y-2 max-h-[220px] overflow-y-auto font-mono text-xs">
               <div id="trade-history-list" class="space-y-1.5">
                 <div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada sesi ini.</div>
+              </div>
+            </div>
+
+            <!-- Tab Content 4: Leaderboard Top 10 Investors -->
+            <div id="tab-content-leaderboard" class="hidden space-y-5">
+              <!-- Top Metrics Bar -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="p-3 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center gap-3">
+                  <div class="h-9 w-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <i data-lucide="crown" class="h-4 w-4"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] uppercase font-bold text-neutral-500 block">Total Market Cap</span>
+                    <span id="lb-market-cap" class="text-xs font-mono font-bold text-white">$0.00</span>
+                  </div>
+                </div>
+
+                <div class="p-3 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center gap-3">
+                  <div class="h-9 w-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary">
+                    <i data-lucide="users" class="h-4 w-4"></i>
+                  </div>
+                  <div>
+                    <span class="text-[10px] uppercase font-bold text-neutral-500 block">Total Investor</span>
+                    <span id="lb-total-investors" class="text-xs font-mono font-bold text-white">0 Pemain</span>
+                  </div>
+                </div>
+
+                <div class="col-span-2 sm:col-span-1 p-3 rounded-2xl bg-neutral-950/80 border border-neutral-800 flex items-center justify-between">
+                  <div>
+                    <span class="text-[10px] uppercase font-bold text-neutral-500 block">Sinkronisasi In-Game</span>
+                    <span class="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1">
+                      <span class="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span> Live /invest top
+                    </span>
+                  </div>
+                  <button onclick="loadLeaderboard()" class="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-[10px] font-bold uppercase transition flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="refresh-cw" class="h-3 w-3"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Top 3 Podium Visual Display -->
+              <div id="leaderboard-podium" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <!-- Injected via JavaScript -->
+              </div>
+
+              <!-- Full Leaderboard Table (Rank 4 to 10) -->
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr class="border-b border-neutral-800 text-neutral-400 font-sans uppercase text-[11px]">
+                      <th class="py-2.5 px-3">Rank</th>
+                      <th class="py-2.5 px-3">Player Gamertag</th>
+                      <th class="py-2.5 px-3">Badge Tier</th>
+                      <th class="py-2.5 px-3">Kas Vault</th>
+                      <th class="py-2.5 px-3">Nilai Portofolio Aset</th>
+                      <th class="py-2.5 px-3 text-right">Total Net Worth</th>
+                    </tr>
+                  </thead>
+                  <tbody id="leaderboard-table-body" class="divide-y divide-neutral-900 text-neutral-300">
+                    <!-- Injected dynamically -->
+                  </tbody>
+                </table>
               </div>
             </div>
 

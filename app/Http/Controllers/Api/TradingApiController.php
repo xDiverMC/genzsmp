@@ -356,4 +356,89 @@ class TradingApiController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Get Top 10 Investors Leaderboard Hall of Fame.
+     *
+     * @return JsonResponse
+     */
+    public function getLeaderboard(): JsonResponse
+    {
+        $prices = [
+            'BTC' => 1020.00,
+            'ETH' => 510.00,
+            'GLD' => 105.00,
+            'DIA' => 65.00,
+            'EMD' => 35.00
+        ];
+
+        $users = InvestUser::with('portfolios')->get();
+        $totalInvestors = $users->count();
+        $totalMarketCap = 0.0;
+
+        $leaderboard = $users->map(function ($u) use ($prices, &$totalMarketCap) {
+            $assetsValue = 0.0;
+            $holdings = [];
+
+            foreach ($u->portfolios as $p) {
+                $sym = strtoupper($p->asset);
+                $amt = (float) $p->amount;
+                $spot = $prices[$sym] ?? 100.0;
+                $val = $amt * $spot;
+                $assetsValue += $val;
+                if ($amt > 0) {
+                    $holdings[$sym] = $amt;
+                }
+            }
+
+            $cash = (float) $u->cash_balance;
+            $netWorth = $cash + $assetsValue;
+            $totalMarketCap += $netWorth;
+
+            // Tier Badge
+            if ($netWorth >= 100000) {
+                $badge = 'WHALE 🐋';
+                $badgeColor = 'purple';
+            } elseif ($netWorth >= 50000) {
+                $badge = 'SHARK 🦈';
+                $badgeColor = 'cyan';
+            } elseif ($netWorth >= 20000) {
+                $badge = 'DOLPHIN 🐬';
+                $badgeColor = 'emerald';
+            } else {
+                $badge = 'FISH 🐟';
+                $badgeColor = 'neutral';
+            }
+
+            $tradeCount = InvestTrade::where('player_name', $u->player_name)->count();
+
+            return [
+                'player_name' => $u->player_name,
+                'is_bedrock' => $u->is_bedrock,
+                'badge' => $badge,
+                'badge_color' => $badgeColor,
+                'cash_balance' => $cash,
+                'assets_value' => $assetsValue,
+                'total_net_worth' => $netWorth,
+                'holdings' => $holdings,
+                'total_trades' => $tradeCount,
+                'avatar_url' => 'https://mc-heads.net/avatar/' . urlencode(ltrim($u->player_name, '.')) . '/64'
+            ];
+        })->sortByDesc('total_net_worth')->values();
+
+        // Assign ranking positions
+        $topList = $leaderboard->take(10)->map(function ($item, $index) {
+            $item['rank'] = $index + 1;
+            return $item;
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_investors' => $totalInvestors,
+                'total_market_cap' => $totalMarketCap,
+                'top_investors' => $topList
+            ]
+        ]);
+    }
 }

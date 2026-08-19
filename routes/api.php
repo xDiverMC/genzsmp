@@ -24,4 +24,5 @@ Route::middleware(['throttle:30,1'])->prefix('trading')->group(function () {
     Route::post('/login', [TradingApiController::class, 'login']);
     Route::post('/trade', [TradingApiController::class, 'executeTrade'])->middleware('throttle:15,1');
     Route::get('/user/{playerName}', [TradingApiController::class, 'getUserState']);
+    Route::get('/leaderboard', [TradingApiController::class, 'getLeaderboard']);
 });

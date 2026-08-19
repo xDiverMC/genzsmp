@@ -932,22 +932,135 @@ function renderTradeHistory() {
 
 function switchBottomTab(tab) {
   document.querySelectorAll('.bottom-tab-btn').forEach(b => {
-    b.classList.remove('bg-primary', 'text-white');
+    b.classList.remove('bg-primary', 'text-white', 'shadow-lg');
     b.classList.add('bg-neutral-900/60', 'text-neutral-400');
   });
 
   const activeBtn = document.getElementById(`tab-btn-${tab}`);
   if (activeBtn) {
-    activeBtn.classList.add('bg-primary', 'text-white');
+    activeBtn.classList.add('bg-primary', 'text-white', 'shadow-lg');
     activeBtn.classList.remove('bg-neutral-900/60', 'text-neutral-400');
   }
 
-  document.getElementById('tab-content-portfolio').classList.add('hidden');
-  document.getElementById('tab-content-orderbook').classList.add('hidden');
-  document.getElementById('tab-content-history').classList.add('hidden');
+  document.getElementById('tab-content-portfolio')?.classList.add('hidden');
+  document.getElementById('tab-content-orderbook')?.classList.add('hidden');
+  document.getElementById('tab-content-history')?.classList.add('hidden');
+  document.getElementById('tab-content-leaderboard')?.classList.add('hidden');
 
   const content = document.getElementById(`tab-content-${tab}`);
   if (content) content.classList.remove('hidden');
+
+  if (tab === 'leaderboard') {
+    loadLeaderboard();
+  }
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// =======================================================
+//   TOP 10 INVESTORS LEADERBOARD ENGINE
+// =======================================================
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/api/trading/leaderboard');
+    const json = await res.json();
+
+    if (!json.success || !json.data) return;
+
+    const { total_investors, total_market_cap, top_investors } = json.data;
+
+    const mCapEl = document.getElementById('lb-market-cap');
+    const tInvEl = document.getElementById('lb-total-investors');
+    if (mCapEl) mCapEl.textContent = `$${total_market_cap.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    if (tInvEl) tInvEl.textContent = `${total_investors} Pemain`;
+
+    // Render Podium (Top 3)
+    const podiumEl = document.getElementById('leaderboard-podium');
+    if (podiumEl) {
+      if (top_investors.length === 0) {
+        podiumEl.innerHTML = `<div class="col-span-3 text-center py-6 text-neutral-500 font-sans">Belum ada data investor.</div>`;
+      } else {
+        const top3 = top_investors.slice(0, 3);
+        const podiumCards = top3.map((inv, idx) => {
+          const rankColors = [
+            { border: 'border-amber-500/50', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: '👑', label: '1ST PLACE' },
+            { border: 'border-slate-400/40', bg: 'bg-slate-400/10', text: 'text-slate-300', icon: '🥈', label: '2ND PLACE' },
+            { border: 'border-amber-700/40', bg: 'bg-amber-700/10', text: 'text-amber-600', icon: '🥉', label: '3RD PLACE' }
+          ][idx] || { border: 'border-neutral-800', bg: 'bg-neutral-900', text: 'text-white', icon: '', label: '' };
+
+          return `
+            <div class="p-4 rounded-2xl ${podiumCardsBg(idx)} border ${rankColors.border} relative overflow-hidden flex flex-col items-center text-center space-y-2.5 shadow-xl">
+              <div class="flex items-center justify-between w-full text-[10px] font-mono font-bold">
+                <span class="${rankColors.text} flex items-center gap-1">${rankColors.icon} ${rankColors.label}</span>
+                <span class="px-2 py-0.5 rounded-full bg-neutral-900/80 border border-neutral-800 text-neutral-300">${inv.badge}</span>
+              </div>
+
+              <div class="relative">
+                <img src="${inv.avatar_url}" alt="${inv.player_name}" class="h-14 w-14 rounded-xl border-2 ${rankColors.border} shadow-lg" onerror="this.src='/images/logo.png'" />
+                ${inv.is_bedrock ? '<span class="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-500 text-black">BE</span>' : ''}
+              </div>
+
+              <div>
+                <h4 class="font-bold text-white text-sm truncate max-w-[140px]">${inv.player_name}</h4>
+                <p class="text-[10px] text-neutral-400">Total Net Worth</p>
+                <p class="font-mono font-black text-sm text-emerald-400">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+
+              <div class="w-full pt-2 border-t border-neutral-800/80 grid grid-cols-2 text-[10px] font-mono text-neutral-400">
+                <div>Kas: <strong class="text-white">$${(inv.cash_balance / 1000).toFixed(1)}k</strong></div>
+                <div>Aset: <strong class="text-white">$${(inv.assets_value / 1000).toFixed(1)}k</strong></div>
+              </div>
+            </div>
+          `;
+        });
+        podiumEl.innerHTML = podiumCards.join('');
+      }
+    }
+
+    // Render Table (Rank 4 - 10)
+    const tableBody = document.getElementById('leaderboard-table-body');
+    if (tableBody) {
+      const rest = top_investors.slice(3);
+      if (rest.length === 0) {
+        if (top_investors.length <= 3) {
+          tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-neutral-500 font-sans">Semua investor terdaftar telah tampil di podium atas.</td></tr>`;
+        }
+      } else {
+        tableBody.innerHTML = rest.map(inv => `
+          <tr class="hover:bg-white/[0.02] transition">
+            <td class="py-2.5 px-3 font-bold text-neutral-400">#${inv.rank}</td>
+            <td class="py-2.5 px-3">
+              <div class="flex items-center gap-2">
+                <img src="${inv.avatar_url}" class="h-6 w-6 rounded-md border border-neutral-800" onerror="this.src='/images/logo.png'" />
+                <span class="font-bold text-white">${inv.player_name}</span>
+                ${inv.is_bedrock ? '<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">BEDROCK</span>' : ''}
+              </div>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">${inv.badge}</span>
+            </td>
+            <td class="py-2.5 px-3 text-neutral-300">$${inv.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <td class="py-2.5 px-3 text-purple-300 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  } catch (err) {
+    console.error('Error loading leaderboard:', err);
+  }
+}
+
+function podiumCardsBg(idx) {
+  if (idx === 0) return 'bg-gradient-to-b from-amber-500/10 via-neutral-950 to-neutral-950';
+  if (idx === 1) return 'bg-gradient-to-b from-slate-400/10 via-neutral-950 to-neutral-950';
+  return 'bg-gradient-to-b from-amber-800/10 via-neutral-950 to-neutral-950';
 }
 
 // =======================================================
@@ -1002,4 +1115,48 @@ function showToast(message, type = 'info') {
     toast.classList.add('opacity-0', 'translate-x-4');
     setTimeout(() => toast.remove(), 300);
   }, 4000);
+}
+
+// =======================================================
+//   PWA (PROGRESSIVE WEB APP) ENGINE
+// =======================================================
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) {
+    btn.classList.remove('hidden');
+    btn.classList.add('flex');
+  }
+});
+
+async function triggerPwaInstall() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('Aplikasi GenzSMP Trading berhasil dipasang di layar utama!', 'success');
+    }
+    deferredPrompt = null;
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) {
+      btn.classList.add('hidden');
+      btn.classList.remove('flex');
+    }
+  } else {
+    showToast('Untuk memasang di HP: Buka menu browser (titik 3) lalu pilih "Tambahkan ke Layar Utama" / "Add to Home Screen".', 'info');
+  }
+}
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      console.log('GenzTrade PWA Service Worker Registered:', reg.scope);
+    }).catch((err) => {
+      console.log('Service Worker registration failed:', err);
+    });
+  });
 }

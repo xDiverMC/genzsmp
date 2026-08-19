@@ -1,0 +1,25 @@
+{
+  "name": "GenzSMP Web Trading Pro",
+  "short_name": "GenzTrade",
+  "description": "Terminal Trading Crypto & Komoditas Resmi GenzSMP Minecraft Server",
+  "start_url": "/trading",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f0f",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
