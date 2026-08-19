@@ -132,14 +132,47 @@ class TradingApiController extends Controller
             ], 403);
         }
 
-        // 2. Verify 6-digit PIN
+        // 2. Anti-Brute-Force PIN Lockout Check (Max 5 attempts -> 15 min lock)
+        $lockKey = "trading_pin_lock:{$user->id}";
+        $attemptsKey = "trading_pin_attempts:{$user->id}";
+
+        if (\Illuminate\Support\Facades\Cache::has($lockKey)) {
+            $lockExpiry = \Illuminate\Support\Facades\Cache::get($lockKey);
+            $remainingSeconds = max(0, $lockExpiry - time());
+            $remainingMinutes = max(1, ceil($remainingSeconds / 60));
+            return response()->json([
+                'success' => false,
+                'error_code' => 'ACCOUNT_LOCKED',
+                'message' => "Akun Anda terkunci sementara karena salah PIN 5x berturut-turut. Silakan coba lagi dalam {$remainingMinutes} menit."
+            ], 429);
+        }
+
+        // 3. Verify 6-digit PIN
         if (!$user->verifyPin($pin)) {
+            $attempts = (int) \Illuminate\Support\Facades\Cache::get($attemptsKey, 0) + 1;
+            \Illuminate\Support\Facades\Cache::put($attemptsKey, $attempts, now()->addMinutes(15));
+
+            if ($attempts >= 5) {
+                \Illuminate\Support\Facades\Cache::put($lockKey, time() + 900, now()->addMinutes(15));
+                \Illuminate\Support\Facades\Cache::forget($attemptsKey);
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'ACCOUNT_LOCKED',
+                    'message' => 'PIN salah 5 kali berturut-turut! Transaksi akun dikunci selama 15 menit demi keamanan.'
+                ], 429);
+            }
+
+            $remainingAttempts = 5 - $attempts;
             return response()->json([
                 'success' => false,
                 'error_code' => 'INVALID_PIN',
-                'message' => 'PIN Keamanan Salah! Pastikan memasukkan 6-digit PIN in-game yang benar.'
+                'message' => "PIN Keamanan Salah! Sisa percobaan: {$remainingAttempts}x sebelum akun dikunci sementara."
             ], 403);
         }
+
+        // Reset failed attempts on success
+        \Illuminate\Support\Facades\Cache::forget($attemptsKey);
+        \Illuminate\Support\Facades\Cache::forget($lockKey);
 
         // 3. Process BUY / SELL Financial Logic
         $subtotal = $amount * $spotPrice;
