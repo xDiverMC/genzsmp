@@ -26,3 +26,11 @@ Route::middleware(['throttle:30,1'])->prefix('trading')->group(function () {
     Route::get('/user/{playerName}', [TradingApiController::class, 'getUserState']);
     Route::get('/leaderboard', [TradingApiController::class, 'getLeaderboard']);
 });
+
+// Outbound HTTPS Bridge for ArqoInvest Java Plugin (No open ports needed on Minecraft server!)
+Route::prefix('invest')->group(function () {
+    Route::post('/sync', [\App\Http\Controllers\Api\InvestSyncController::class, 'sync']);
+    Route::post('/setpin', [\App\Http\Controllers\Api\InvestSyncController::class, 'setPin']);
+    Route::post('/trade', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameTrade']);
+});
+

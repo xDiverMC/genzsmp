@@ -202,12 +202,14 @@ class TradingApiController extends Controller
                 ], 400);
             }
 
-            // 1. Deduct real in-game Vault money via RCON
-            try {
-                $this->rconService->takeMoney($playerName, $totalCost);
-            } catch (\Throwable $e) {
-                // Non-blocking if RCON server offline
-            }
+            // 1. Queue in-game Vault withdrawal for ArqoInvest Java plugin HTTP sync
+            \App\Models\InvestAction::create([
+                'player_name' => $user->player_name,
+                'action_type' => 'WITHDRAW',
+                'amount' => $totalCost,
+                'reason' => "Web Trade Beli {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
+                'status' => 'PENDING'
+            ]);
 
             // Deduct local database cash balance
             $user->cash_balance -= $totalCost;
@@ -235,12 +237,14 @@ class TradingApiController extends Controller
 
             $netPayout = $subtotal - $tax;
 
-            // 1. Give real in-game Vault money via RCON
-            try {
-                $this->rconService->giveMoney($playerName, $netPayout);
-            } catch (\Throwable $e) {
-                // Non-blocking if RCON server offline
-            }
+            // 1. Queue in-game Vault deposit for ArqoInvest Java plugin HTTP sync
+            \App\Models\InvestAction::create([
+                'player_name' => $user->player_name,
+                'action_type' => 'DEPOSIT',
+                'amount' => $netPayout,
+                'reason' => "Web Trade Jual {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
+                'status' => 'PENDING'
+            ]);
 
             // Credit local database cash balance
             $user->cash_balance += $netPayout;
