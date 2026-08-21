@@ -254,16 +254,11 @@ async function loginPlayer(playerName, fromModal = false) {
         setTimeout(() => modal.classList.remove('animate-shake'), 400);
       }
 
-      // If called from auto-load on start, open modal to inform user
       if (!fromModal) {
-        openLoginModal();
-        if (errorBox && errorText) {
-          errorText.textContent = json.message || `Akun '${playerName}' belum terdaftar di sistem.`;
-          errorBox.classList.remove('hidden');
-        }
+        localStorage.removeItem('genzsmp_trading_player');
+      } else {
+        showToast(json.message || 'Akun tidak terdaftar!', 'danger');
       }
-
-      showToast(json.message || 'Akun tidak terdaftar!', 'danger');
       return false;
     }
   } catch (err) {

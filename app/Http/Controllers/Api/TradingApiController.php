@@ -43,11 +43,7 @@ class TradingApiController extends Controller
         $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'USER_NOT_REGISTERED',
-                'message' => "Akun Gamertag '{$playerName}' belum terdaftar di sistem! Silakan login ke in-game server Minecraft (genzsmp.site) dan ketik: /invest setpin <6-digit> terlebih dahulu."
-            ], 404);
+            $user = InvestUser::findOrCreateByName($playerName);
         }
 
         $user->update(['last_login_at' => now()]);
@@ -123,13 +119,17 @@ class TradingApiController extends Controller
             ], 404);
         }
 
-        // 1. Check if user has PIN set
+        // 1. Check if user has PIN set or set it on first trade
         if (!$user->hasPin()) {
-            return response()->json([
-                'success' => false,
-                'error_code' => 'PIN_NOT_SET',
-                'message' => 'Akun Anda belum memiliki PIN Keamanan Trading! Silakan masuk ke server Minecraft dan ketik: /invest setpin <6-digit>'
-            ], 403);
+            if (preg_match('/^[0-9]{6}$/', $pin)) {
+                $user->setPin($pin);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error_code' => 'PIN_NOT_SET',
+                    'message' => 'Akun Anda belum memiliki PIN Keamanan Trading! Masukkan 6 angka numerik untuk menetapkan PIN Anda.'
+                ], 403);
+            }
         }
 
         // 2. Anti-Brute-Force PIN Lockout Check (Max 5 attempts -> 15 min lock)
