@@ -1039,24 +1039,25 @@ async function loadLeaderboard() {
         if (rest.length === 0) {
           tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-neutral-500 font-sans">Semua investor terdaftar telah tampil di podium atas.</td></tr>`;
         } else {
-        tableBody.innerHTML = rest.map(inv => `
-          <tr class="hover:bg-white/[0.02] transition">
-            <td class="py-2.5 px-3 font-bold text-neutral-400">#${inv.rank}</td>
-            <td class="py-2.5 px-3">
-              <div class="flex items-center gap-2">
-                <img src="${inv.avatar_url}" class="h-6 w-6 rounded-md border border-neutral-800" onerror="this.src='/images/logo.png'" />
-                <span class="font-bold text-white">${inv.player_name}</span>
-                ${inv.is_bedrock ? '<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">BEDROCK</span>' : ''}
-              </div>
-            </td>
-            <td class="py-2.5 px-3">
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">${inv.badge}</span>
-            </td>
-            <td class="py-2.5 px-3 text-neutral-300">$${inv.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-            <td class="py-2.5 px-3 text-purple-300 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-            <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-          </tr>
-        `).join('');
+          tableBody.innerHTML = rest.map(inv => `
+            <tr class="hover:bg-white/[0.02] transition">
+              <td class="py-2.5 px-3 font-bold text-neutral-400">#${inv.rank}</td>
+              <td class="py-2.5 px-3">
+                <div class="flex items-center gap-2">
+                  <img src="${inv.avatar_url}" class="h-6 w-6 rounded-md border border-neutral-800" onerror="this.src='/images/logo.png'" />
+                  <span class="font-bold text-white">${inv.player_name}</span>
+                  ${inv.is_bedrock ? '<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">BEDROCK</span>' : ''}
+                </div>
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">${inv.badge}</span>
+              </td>
+              <td class="py-2.5 px-3 text-neutral-300">$${inv.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td class="py-2.5 px-3 text-purple-300 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('');
+        }
       }
     }
 
