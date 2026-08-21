@@ -980,7 +980,17 @@ async function loadLeaderboard() {
     const podiumEl = document.getElementById('leaderboard-podium');
     if (podiumEl) {
       if (top_investors.length === 0) {
-        podiumEl.innerHTML = `<div class="col-span-3 text-center py-6 text-neutral-500 font-sans">Belum ada data investor.</div>`;
+        podiumEl.innerHTML = `
+          <div class="col-span-1 sm:col-span-3 text-center py-10 px-4 rounded-2xl bg-neutral-950/60 border border-neutral-900 space-y-2">
+            <div class="mx-auto h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <i data-lucide="trophy" class="h-6 w-6"></i>
+            </div>
+            <h4 class="font-bold text-white text-sm">Belum Ada Investor Terdaftar</h4>
+            <p class="text-xs text-neutral-400 max-w-md mx-auto leading-relaxed">
+              Jadilah yang pertama masuk ke Top 10 Hall of Fame! Masuk ke server Minecraft in-game (<code class="text-primary">genzsmp.site</code>) dan ketik: <strong class="text-white">/invest setpin &lt;6-digit&gt;</strong> untuk memulai portofolio Anda.
+            </p>
+          </div>
+        `;
       } else {
         const top3 = top_investors.slice(0, 3);
         const podiumCards = top3.map((inv, idx) => {
@@ -1022,12 +1032,13 @@ async function loadLeaderboard() {
     // Render Table (Rank 4 - 10)
     const tableBody = document.getElementById('leaderboard-table-body');
     if (tableBody) {
-      const rest = top_investors.slice(3);
-      if (rest.length === 0) {
-        if (top_investors.length <= 3) {
-          tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-neutral-500 font-sans">Semua investor terdaftar telah tampil di podium atas.</td></tr>`;
-        }
+      if (top_investors.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-neutral-500 font-sans">Belum ada riwayat transaksi investor pada sesi ini.</td></tr>`;
       } else {
+        const rest = top_investors.slice(3);
+        if (rest.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-neutral-500 font-sans">Semua investor terdaftar telah tampil di podium atas.</td></tr>`;
+        } else {
         tableBody.innerHTML = rest.map(inv => `
           <tr class="hover:bg-white/[0.02] transition">
             <td class="py-2.5 px-3 font-bold text-neutral-400">#${inv.rank}</td>
