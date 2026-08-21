@@ -48,30 +48,7 @@
     }
   }, true);
 
-  // 2. DISABLE RIGHT-CLICK CONTEXT MENU (DESKTOP MOUSE ONLY)
-  document.addEventListener('contextmenu', function (e) {
-    const target = e.target.tagName.toLowerCase();
-    if (target === 'input' || target === 'textarea') {
-      return true;
-    }
-    // Only prevent on actual mouse right clicks, don't interrupt mobile touch
-    if (e.pointerType === 'touch') {
-      return true;
-    }
-    e.preventDefault();
-    notifyBlockedAction('Klik kanan dinonaktifkan untuk melindungi aset server.');
-    return false;
-  });
-
-  // 3. DISABLE DRAG & DROP OF IMAGES
-  document.addEventListener('dragstart', function (e) {
-    if (e.target.nodeName.toUpperCase() === 'IMG') {
-      e.preventDefault();
-      return false;
-    }
-  });
-
-  // 4. SELF-XSS CONSOLE BANNER
+  // 2. SELF-XSS CONSOLE BANNER
   function printConsoleWarning() {
     if (typeof console !== 'undefined') {
       console.log(
