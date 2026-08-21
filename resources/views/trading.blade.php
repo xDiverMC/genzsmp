@@ -342,19 +342,19 @@
 
           <!-- Bottom Tabs: Portfolio & Orderbook & Logs -->
           <div class="glass-panel rounded-2xl p-5 space-y-4">
-            <div class="border-b border-neutral-800/80 pb-3 overflow-x-auto">
-              <div class="flex gap-2 min-w-max">
-                <button onclick="switchBottomTab('portfolio')" id="tab-btn-portfolio" class="bottom-tab-btn active px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="pie-chart" class="h-3.5 w-3.5"></i> Portofolio Saya
+            <div class="border-b border-neutral-800/80 pb-3">
+              <div class="flex flex-wrap gap-2">
+                <button onclick="switchBottomTab('portfolio')" id="tab-btn-portfolio" class="bottom-tab-btn active px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="pie-chart" class="h-3.5 w-3.5"></i> Portofolio
                 </button>
-                <button onclick="switchBottomTab('orderbook')" id="tab-btn-orderbook" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                <button onclick="switchBottomTab('orderbook')" id="tab-btn-orderbook" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="book-open" class="h-3.5 w-3.5"></i> Orderbook
                 </button>
-                <button onclick="switchBottomTab('history')" id="tab-btn-history" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
-                  <i data-lucide="history" class="h-3.5 w-3.5"></i> Riwayat Transaksi
+                <button onclick="switchBottomTab('history')" id="tab-btn-history" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="history" class="h-3.5 w-3.5"></i> Riwayat
                 </button>
-                <button onclick="switchBottomTab('leaderboard')" id="tab-btn-leaderboard" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/10 cursor-pointer">
-                  <i data-lucide="trophy" class="h-3.5 w-3.5 text-amber-400"></i> Top Investor Hall of Fame
+                <button onclick="switchBottomTab('leaderboard')" id="tab-btn-leaderboard" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/10 cursor-pointer">
+                  <i data-lucide="trophy" class="h-3.5 w-3.5 text-amber-400"></i> Top Investor
                 </button>
               </div>
             </div>
