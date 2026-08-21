@@ -107,6 +107,66 @@ class MinecraftRconService
     }
 
     /**
+     * Deduct / Take In-Game Money from a player via Vault / Essentials.
+     *
+     * @param string $player
+     * @param float|int $amount
+     * @return array
+     */
+    public function takeMoney(string $player, float|int $amount): array
+    {
+        $sanitizedPlayer = preg_replace('/[^a-zA-Z0-9_.]/', '', $player);
+        $amount = (float) $amount;
+
+        if (empty($sanitizedPlayer) || $amount <= 0) {
+            return ['success' => false, 'error' => 'Invalid player name or money amount.'];
+        }
+
+        $cmd = "eco take {$sanitizedPlayer} {$amount}";
+        $res = $this->sendCommand($cmd);
+
+        return [
+            'success' => $res['success'],
+            'player' => $sanitizedPlayer,
+            'amount' => $amount,
+            'response' => $res['response'],
+            'error' => $res['error']
+        ];
+    }
+
+    /**
+     * Query real in-game Vault balance of a player.
+     *
+     * @param string $player
+     * @return float|null Returns balance as float, or null if unreachable
+     */
+    public function getPlayerBalance(string $player): ?float
+    {
+        $sanitizedPlayer = preg_replace('/[^a-zA-Z0-9_.]/', '', $player);
+        if (empty($sanitizedPlayer)) {
+            return null;
+        }
+
+        $cmd = "eco balance {$sanitizedPlayer}";
+        $res = $this->sendCommand($cmd);
+
+        if (!$res['success'] || empty($res['response'])) {
+            // Fallback command: balance <player>
+            $res = $this->sendCommand("balance {$sanitizedPlayer}");
+        }
+
+        if ($res['success'] && !empty($res['response'])) {
+            // Regex match balance digits like "$500,000.00" or "500000" or "Balance: 500000"
+            if (preg_match('/(?:Balance:|\$|saldo:?)\s*([0-9,.]+)/i', $res['response'], $matches)) {
+                $cleaned = str_replace(',', '', $matches[1]);
+                return (float) $cleaned;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Give In-Game Money to a player via Vault / Essentials.
      *
      * @param string $player
@@ -115,7 +175,7 @@ class MinecraftRconService
      */
     public function giveMoney(string $player, float|int $amount): array
     {
-        $sanitizedPlayer = preg_replace('/[^a-zA-Z0-9_]/', '', $player);
+        $sanitizedPlayer = preg_replace('/[^a-zA-Z0-9_.]/', '', $player);
         $amount = (float) $amount;
 
         if (empty($sanitizedPlayer) || $amount <= 0) {

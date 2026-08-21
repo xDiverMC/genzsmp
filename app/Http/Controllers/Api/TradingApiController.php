@@ -46,7 +46,17 @@ class TradingApiController extends Controller
             $user = InvestUser::findOrCreateByName($playerName);
         }
 
-        $user->update(['last_login_at' => now()]);
+        // Try live Vault balance sync via RCON if reachable
+        try {
+            $liveBalance = $this->rconService->getPlayerBalance($playerName);
+            if ($liveBalance !== null && $liveBalance >= 0) {
+                $user->cash_balance = $liveBalance;
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking if RCON server offline
+        }
+
+        $user->update(['last_login_at' => now(), 'cash_balance' => $user->cash_balance]);
 
         // Load portfolios
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
@@ -192,7 +202,14 @@ class TradingApiController extends Controller
                 ], 400);
             }
 
-            // Deduct cash balance
+            // 1. Deduct real in-game Vault money via RCON
+            try {
+                $this->rconService->takeMoney($playerName, $totalCost);
+            } catch (\Throwable $e) {
+                // Non-blocking if RCON server offline
+            }
+
+            // Deduct local database cash balance
             $user->cash_balance -= $totalCost;
             $user->save();
 
@@ -218,7 +235,14 @@ class TradingApiController extends Controller
 
             $netPayout = $subtotal - $tax;
 
-            // Credit cash balance
+            // 1. Give real in-game Vault money via RCON
+            try {
+                $this->rconService->giveMoney($playerName, $netPayout);
+            } catch (\Throwable $e) {
+                // Non-blocking if RCON server offline
+            }
+
+            // Credit local database cash balance
             $user->cash_balance += $netPayout;
             $user->save();
 
@@ -338,6 +362,17 @@ class TradingApiController extends Controller
                 'success' => false,
                 'message' => 'Player tidak ditemukan'
             ], 404);
+        }
+
+        // Try live Vault balance sync via RCON if reachable
+        try {
+            $liveBalance = $this->rconService->getPlayerBalance($user->player_name);
+            if ($liveBalance !== null && $liveBalance >= 0) {
+                $user->cash_balance = $liveBalance;
+                $user->save();
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking if RCON server offline
         }
 
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
