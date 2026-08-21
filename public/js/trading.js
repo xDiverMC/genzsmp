@@ -110,6 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderOrderbook();
   calculateTradeCost();
 
+  // Bind login trigger button click
+  const loginTrigger = document.getElementById('login-trigger-btn');
+  if (loginTrigger) {
+    loginTrigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      openLoginModal();
+    });
+  }
+
   // Check login: URL query param or saved localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const playerParam = urlParams.get('player');
@@ -140,6 +149,7 @@ function openLoginModal() {
     }
   }
 }
+window.openLoginModal = openLoginModal;
 
 function closeLoginModal() {
   const modal = document.getElementById('login-modal');
@@ -148,6 +158,7 @@ function closeLoginModal() {
     modal.classList.remove('flex');
   }
 }
+window.closeLoginModal = closeLoginModal;
 
 async function handleLoginSubmit(e) {
   e.preventDefault();

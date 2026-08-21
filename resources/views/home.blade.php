@@ -151,8 +151,5 @@
 
     <!-- React Application -->
     <script type="text/babel" src="/js/app.js"></script>
-
-    <!-- Client-Side Security & Anti-Inspect Protection -->
-    <script src="/js/security.js"></script>
   </body>
 </html>

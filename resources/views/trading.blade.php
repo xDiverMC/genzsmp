@@ -739,8 +739,5 @@
 
     <!-- Trading Controller Script -->
     <script src="/js/trading.js"></script>
-
-    <!-- Client-Side Security & Anti-Inspect Protection -->
-    <script src="/js/security.js"></script>
   </body>
 </html>
