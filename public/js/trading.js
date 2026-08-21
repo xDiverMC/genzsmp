@@ -1189,13 +1189,20 @@ async function triggerPwaInstall() {
   }
 }
 
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
-      console.log('GenzTrade PWA Service Worker Registered:', reg.scope);
-    }).catch((err) => {
-      console.log('Service Worker registration failed:', err);
-    });
-  });
-}
+// Expose all interactive functions explicitly on window
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
+window.handleLoginSubmit = handleLoginSubmit;
+window.openPinModal = openPinModal;
+window.closePinModal = closePinModal;
+window.handlePinSubmit = handlePinSubmit;
+window.promptPinModal = promptPinModal;
+window.switchBottomTab = switchBottomTab;
+window.selectAsset = selectAsset;
+window.setTradeType = setTradeType;
+window.setPercentageAmount = setPercentageAmount;
+window.setTimeframe = setTimeframe;
+window.calculateTradeCost = calculateTradeCost;
+window.triggerPwaInstall = triggerPwaInstall;
+window.loginPlayer = loginPlayer;
+

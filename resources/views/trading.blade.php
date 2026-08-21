@@ -760,7 +760,7 @@
       })();
     </script>
 
-    <!-- Trading Controller Script -->
-    <script src="/js/trading.js"></script>
+    <!-- Trading Controller Script (Cache-Busted) -->
+    <script src="/js/trading.js?v={{ time() }}"></script>
   </body>
 </html>

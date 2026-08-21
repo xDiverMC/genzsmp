@@ -166,7 +166,7 @@
       })();
     </script>
 
-    <!-- React Application -->
-    <script type="text/babel" src="/js/app.js"></script>
+    <!-- React Application (Cache-Busted) -->
+    <script type="text/babel" src="/js/app.js?v={{ time() }}"></script>
   </body>
 </html>
