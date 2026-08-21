@@ -149,6 +149,23 @@
       };
     </script>
 
+    <!-- Force NUKE all old Service Workers and caches -->
+    <script>
+      (async function() {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) { await reg.unregister(); }
+        }
+        if ('caches' in window) {
+          const names = await caches.keys();
+          for (const name of names) { await caches.delete(name); }
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js');
+        }
+      })();
+    </script>
+
     <!-- React Application -->
     <script type="text/babel" src="/js/app.js"></script>
   </body>

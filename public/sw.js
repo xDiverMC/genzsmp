@@ -1,13 +1,13 @@
 /**
- * GenzSMP PWA Service Worker
+ * GenzSMP PWA Service Worker v2
+ * CACHE BUSTED: security.js removed, old v1 cache purged
  */
-const CACHE_NAME = 'genzsmp-pwa-v1';
+const CACHE_NAME = 'genzsmp-pwa-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/trading',
   '/images/logo.png',
-  '/manifest.json',
-  '/js/security.js'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,14 +31,16 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Always fetch fresh API requests over network
-  if (event.request.url.includes('/api/')) {
+  // Never cache API or JS requests - always go to network
+  if (event.request.url.includes('/api/') || event.request.url.endsWith('.js')) {
     return;
   }
 
+  // Network-first strategy: try network, fallback to cache
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);
     })
   );
 });
+

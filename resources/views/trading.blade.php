@@ -736,6 +736,29 @@
         csrfToken: "{{ csrf_token() }}"
       };
     </script>
+    <!-- Force NUKE all old Service Workers and caches -->
+    <script>
+      (async function() {
+        // 1. Unregister ALL service workers first
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) {
+            await reg.unregister();
+          }
+        }
+        // 2. Delete ALL caches
+        if ('caches' in window) {
+          const names = await caches.keys();
+          for (const name of names) {
+            await caches.delete(name);
+          }
+        }
+        // 3. Re-register fresh SW v2
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js');
+        }
+      })();
+    </script>
 
     <!-- Trading Controller Script -->
     <script src="/js/trading.js"></script>
