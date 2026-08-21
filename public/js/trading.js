@@ -1193,10 +1193,10 @@ async function triggerPwaInstall() {
 window.openLoginModal = openLoginModal;
 window.closeLoginModal = closeLoginModal;
 window.handleLoginSubmit = handleLoginSubmit;
-window.openPinModal = openPinModal;
+window.promptPinModal = promptPinModal;
+window.openPinModal = promptPinModal;
 window.closePinModal = closePinModal;
 window.handlePinSubmit = handlePinSubmit;
-window.promptPinModal = promptPinModal;
 window.switchBottomTab = switchBottomTab;
 window.selectAsset = selectAsset;
 window.setTradeType = setTradeType;
