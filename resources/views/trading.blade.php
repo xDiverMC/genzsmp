@@ -7,13 +7,17 @@
     <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung dengan akun Minecraft, Vault Economy, dan PIN Keamanan 6-Digit." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
+    <!-- Favicon & Touch Icons -->
+    <link rel="icon" type="image/png" href="/images/logo.png" />
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png" />
+    <link rel="apple-touch-icon" href="/images/logo.png" />
+
     <!-- PWA Manifest & App Metadata -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#8b5cf6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="GenzTrade" />
-    <link rel="apple-touch-icon" href="{{ asset('images/logo.png') }}" />
 
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -130,28 +134,25 @@
     <div id="trading-app" class="relative z-10 min-h-screen flex flex-col">
 
       <!-- NAVBAR HEADER -->
-      <header class="glass-panel sticky top-0 z-40 border-b border-purple-500/10 px-4 lg:px-8 py-3.5 flex items-center justify-between">
-        <div class="flex items-center gap-6">
+      <header class="glass-panel sticky top-0 z-40 border-b border-purple-500/10 px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-4 sm:gap-6">
           <!-- Logo & Brand -->
-          <a href="{{ route('home') }}" class="flex items-center gap-3 group focus:outline-none">
+          <a href="{{ route('home') }}" class="flex items-center gap-2 sm:gap-3 group focus:outline-none shrink-0">
             <img 
-              src="{{ asset('images/logo.png') }}" 
+              src="/images/logo.png" 
               alt="GenzSMP Logo" 
-              class="h-9 w-9 rounded-xl border border-purple-500/30 object-cover shadow-lg group-hover:scale-105 transition-transform"
+              class="h-7 w-7 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl border border-purple-500/30 object-cover shadow-lg group-hover:scale-105 transition-transform shrink-0"
             />
             <div class="flex flex-col">
-              <span class="font-display text-lg font-black tracking-wider uppercase text-white leading-tight">
+              <span class="font-display text-xs sm:text-lg font-black tracking-wider uppercase text-white leading-tight">
                 {{ $serverInfo['name'] }}<span class="text-primary">{{ $serverInfo['suffix'] }}</span>
               </span>
-              <span class="text-[10px] font-bold uppercase tracking-widest text-primary/80">Trading Terminal Pro</span>
+              <span class="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-primary/80">Trading Terminal Pro</span>
             </div>
           </a>
 
-          <!-- Quick Navigation Links -->
-          <nav class="hidden md:flex items-center gap-2 border-l border-neutral-800 pl-6">
-            <a href="{{ route('home') }}" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-900 transition">
-              Portal Home
-            </a>
+          <!-- Quick Navigation Links (Desktop) -->
+          <nav class="hidden md:flex items-center gap-2 border-l border-neutral-800 pl-4">
             <a href="{{ route('home') }}#rank-money" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white hover:bg-neutral-900 transition">
               Web Store
             </a>
@@ -161,25 +162,35 @@
           </nav>
         </div>
 
-        <!-- Right Header: Player Vault Balance & Profile Controls -->
-        <div class="flex items-center gap-3">
+        <!-- Right Header: Back to Home, Balance, Profile & Login Button -->
+        <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
           
+          <!-- Back to Home Button -->
+          <a 
+            href="{{ route('home') }}" 
+            class="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-neutral-900/90 hover:bg-neutral-800 border border-neutral-800 hover:border-purple-500/40 text-neutral-300 hover:text-white text-[11px] sm:text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer shrink-0"
+            title="Kembali ke Halaman Utama"
+          >
+            <i data-lucide="arrow-left" class="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary"></i>
+            <span>Beranda</span>
+          </a>
+
           <!-- Player Account Info Card (Logged In) -->
-          <div id="player-profile-bar" class="hidden items-center gap-3 bg-neutral-950/80 border border-purple-500/20 rounded-2xl px-4 py-2 shadow-inner">
-            <div class="flex items-center gap-2">
-              <div class="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-purple-600 p-0.5 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                <i data-lucide="user" class="h-4 w-4"></i>
+          <div id="player-profile-bar" class="hidden items-center gap-2 sm:gap-3 bg-neutral-950/80 border border-purple-500/20 rounded-xl sm:rounded-2xl px-2.5 sm:px-4 py-1 sm:py-2 shadow-inner">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+              <div class="h-6 w-6 sm:h-8 sm:w-8 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary to-purple-600 p-0.5 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                <i data-lucide="user" class="h-3.5 w-3.5 sm:h-4 sm:w-4"></i>
               </div>
               <div class="flex flex-col">
-                <div class="flex items-center gap-1.5">
-                  <span id="player-name-display" class="font-bold text-xs text-white">Player</span>
-                  <span id="player-bedrock-badge" class="hidden px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                    BEDROCK
+                <div class="flex items-center gap-1 sm:gap-1.5">
+                  <span id="player-name-display" class="font-bold text-[11px] sm:text-xs text-white">Player</span>
+                  <span id="player-bedrock-badge" class="hidden px-1 sm:px-1.5 py-0.2 rounded text-[7px] sm:text-[8px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    BE
                   </span>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span id="player-cash-display" class="font-mono text-xs font-black text-emerald-400">$0.00</span>
-                  <span id="pin-status-badge" class="text-[9px] font-mono text-neutral-500">● PIN: -</span>
+                <div class="flex items-center gap-1 sm:gap-2">
+                  <span id="player-cash-display" class="font-mono text-[11px] sm:text-xs font-black text-emerald-400">$0.00</span>
+                  <span id="pin-status-badge" class="hidden sm:inline text-[9px] font-mono text-neutral-500">● PIN: -</span>
                 </div>
               </div>
             </div>
@@ -188,9 +199,9 @@
             <button 
               onclick="openLoginModal()" 
               title="Ganti Akun Minecraft"
-              class="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition text-xs"
+              class="p-1 sm:p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition text-xs cursor-pointer"
             >
-              <i data-lucide="log-out" class="h-3.5 w-3.5"></i>
+              <i data-lucide="log-out" class="h-3 w-3 sm:h-3.5 sm:w-3.5"></i>
             </button>
           </div>
 
@@ -198,19 +209,20 @@
           <button 
             id="pwa-install-btn" 
             onclick="triggerPwaInstall()" 
-            class="hidden items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-emerald-500/10 cursor-pointer"
+            class="hidden items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/30 text-emerald-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition shadow-lg shadow-emerald-500/10 cursor-pointer shrink-0"
           >
-            <i data-lucide="smartphone" class="h-3.5 w-3.5"></i>
-            <span>Install App</span>
+            <i data-lucide="smartphone" class="h-3 w-3 sm:h-3.5 sm:w-3.5"></i>
+            <span class="hidden xs:inline sm:inline">Install</span>
           </button>
 
           <!-- Login Button (If Logged Out) -->
           <button 
             id="login-trigger-btn"
             onclick="openLoginModal()"
-            class="flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-purple-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-purple-500/20 hover:brightness-110 active:scale-95 transition cursor-pointer"
+            class="flex items-center gap-1 sm:gap-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-primary to-purple-600 px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-white shadow-md shadow-purple-500/20 hover:brightness-110 active:scale-95 transition cursor-pointer shrink-0"
           >
-            <i data-lucide="log-in" class="h-4 w-4"></i> Masuk Akun
+            <i data-lucide="log-in" class="h-3 w-3 sm:h-4 sm:w-4"></i>
+            <span>Masuk</span>
           </button>
 
         </div>
@@ -224,12 +236,12 @@
         </div>
         <div class="overflow-hidden relative flex-1">
           <div id="news-ticker" class="animate-ticker text-neutral-300">
-            <span class="mx-6">🚀 BTC Market Bullish: Sentimen positif mendorong kenaikan harga +4.2%</span>
-            <span class="mx-6">💎 Diamond Mining Spike: Pasokan DIA stabil di level $245</span>
-            <span class="mx-6">🔐 Sistem PIN Keamanan: Transaksi Buy/Sell di web dijamin aman dengan 6-digit PIN in-game</span>
-            <span class="mx-6">⚡ ETH Smart Economy: Likuiditas likuid di pasar in-game GenzSMP</span>
-            <span class="mx-6">👑 Protokol Transaksi: 2% burn tax diterapkan otomatis pada setiap penjualan</span>
-            <span class="mx-6">🛡️ Anti-Whale Engine: Rate-limit 5 detik melindungi stabilitas likuiditas</span>
+            <span class="mx-6"><strong class="text-emerald-400">[BULLISH]</strong> BTC Market: Sentimen positif mendorong kenaikan harga +4.2%</span>
+            <span class="mx-6"><strong class="text-cyan-400">[MINING]</strong> Diamond Mining Spike: Pasokan DIA stabil di level $245</span>
+            <span class="mx-6"><strong class="text-amber-400">[SECURITY]</strong> Sistem PIN Keamanan: Transaksi Buy/Sell dijamin aman dengan 6-digit PIN in-game</span>
+            <span class="mx-6"><strong class="text-purple-400">[LIQUIDITY]</strong> ETH Smart Economy: Likuiditas likuid di pasar in-game GenzSMP</span>
+            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> 2% burn tax diterapkan otomatis pada setiap penjualan aset</span>
+            <span class="mx-6"><strong class="text-emerald-400">[ANTI-WHALE]</strong> Rate-limit 5 detik melindungi stabilitas likuiditas pasar</span>
           </div>
         </div>
       </div>
@@ -330,18 +342,18 @@
 
           <!-- Bottom Tabs: Portfolio & Orderbook & Logs -->
           <div class="glass-panel rounded-2xl p-5 space-y-4">
-            <div class="flex items-center justify-between border-b border-neutral-800/80 pb-3">
-              <div class="flex gap-2">
-                <button onclick="switchBottomTab('portfolio')" id="tab-btn-portfolio" class="bottom-tab-btn active px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5">
+            <div class="border-b border-neutral-800/80 pb-3 overflow-x-auto">
+              <div class="flex gap-2 min-w-max">
+                <button onclick="switchBottomTab('portfolio')" id="tab-btn-portfolio" class="bottom-tab-btn active px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="pie-chart" class="h-3.5 w-3.5"></i> Portofolio Saya
                 </button>
-                <button onclick="switchBottomTab('orderbook')" id="tab-btn-orderbook" class="bottom-tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5">
+                <button onclick="switchBottomTab('orderbook')" id="tab-btn-orderbook" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="book-open" class="h-3.5 w-3.5"></i> Orderbook
                 </button>
-                <button onclick="switchBottomTab('history')" id="tab-btn-history" class="bottom-tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5">
+                <button onclick="switchBottomTab('history')" id="tab-btn-history" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="history" class="h-3.5 w-3.5"></i> Riwayat Transaksi
                 </button>
-                <button onclick="switchBottomTab('leaderboard')" id="tab-btn-leaderboard" class="bottom-tab-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/10">
+                <button onclick="switchBottomTab('leaderboard')" id="tab-btn-leaderboard" class="bottom-tab-btn px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5 shadow-lg shadow-amber-500/10 cursor-pointer">
                   <i data-lucide="trophy" class="h-3.5 w-3.5 text-amber-400"></i> Top Investor Hall of Fame
                 </button>
               </div>
@@ -567,18 +579,18 @@
       <!-- MODAL 1: LOGIN / USERNAME PROMPT MODAL                    -->
       <!-- ========================================================= -->
       <div id="login-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-        <div class="glass-panel max-w-md w-full rounded-3xl p-7 border border-purple-500/30 text-center space-y-6 shadow-2xl relative overflow-hidden">
+        <div class="glass-panel max-w-md w-full rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-purple-500/30 text-center space-y-4 sm:space-y-6 shadow-2xl relative overflow-hidden">
           <div class="absolute -top-20 -left-20 h-40 w-40 rounded-full bg-purple-600/20 blur-3xl"></div>
 
-          <div class="mx-auto h-16 w-16 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary shadow-xl">
-            <i data-lucide="user-check" class="h-8 w-8"></i>
+          <div class="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary shadow-xl">
+            <i data-lucide="user-check" class="h-6 w-6 sm:h-8 sm:w-8"></i>
           </div>
 
           <div class="space-y-1.5">
             <span class="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-primary border border-purple-500/20">
               Autentikasi Akun Minecraft
             </span>
-            <h2 class="font-display text-2xl font-black text-white uppercase">Masuk Terminal</h2>
+            <h2 class="font-display text-xl sm:text-2xl font-black text-white uppercase">Masuk Terminal</h2>
             <p class="text-xs text-neutral-400">
               Masukkan Gamertag Minecraft Anda (Gunakan awalan <strong class="text-cyan-400">.</strong> untuk Bedrock Edition, contoh: <code class="text-white">.SteveGenz</code>).
             </p>
@@ -593,13 +605,13 @@
                   id="login-username-input" 
                   placeholder="Contoh: SteveGenz atau .SteveGenz" 
                   required
-                  class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3.5 text-white font-mono text-sm focus:outline-none placeholder-neutral-600"
+                  class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3 sm:py-3.5 text-white font-mono text-sm focus:outline-none placeholder-neutral-600"
                 />
               </div>
             </div>
 
             <!-- Login Error Notice -->
-            <div id="login-error-msg" class="hidden p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed space-y-1">
+            <div id="login-error-msg" class="hidden p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed space-y-1">
               <div class="font-bold flex items-center gap-1.5 text-red-400">
                 <i data-lucide="alert-circle" class="h-4 w-4 shrink-0"></i>
                 <span id="login-error-title">Akun Belum Terdaftar!</span>
@@ -610,7 +622,7 @@
             <button 
               type="submit" 
               id="login-submit-btn"
-              class="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-purple-500/20"
+              class="w-full py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-purple-500/20"
             >
               Masuk & Buka Portofolio
             </button>
@@ -618,7 +630,7 @@
 
           <div class="pt-2 border-t border-neutral-900 flex justify-between items-center text-xs text-neutral-500">
             <span>Server: <strong class="text-white font-mono">genzsmp.site</strong></span>
-            <button onclick="closeLoginModal()" class="hover:text-white transition">Tutup</button>
+            <button onclick="closeLoginModal()" class="hover:text-white transition cursor-pointer">Tutup</button>
           </div>
         </div>
       </div>
@@ -627,11 +639,11 @@
       <!-- MODAL 2: 6-DIGIT PIN SECURITY MODAL (REQUIRED FOR TRADE)  -->
       <!-- ========================================================= -->
       <div id="pin-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-        <div id="pin-modal-card" class="glass-panel max-w-md w-full rounded-3xl p-7 border border-purple-500/30 text-center space-y-5 shadow-2xl relative overflow-hidden">
+        <div id="pin-modal-card" class="glass-panel max-w-md w-full rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-purple-500/30 text-center space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden">
           <div class="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-purple-600/20 blur-3xl"></div>
 
-          <div class="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-purple-700 p-0.5 shadow-xl flex items-center justify-center text-white">
-            <i data-lucide="key-round" class="h-8 w-8"></i>
+          <div class="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-purple-700 p-0.5 shadow-xl flex items-center justify-center text-white">
+            <i data-lucide="key-round" class="h-6 w-6 sm:h-8 sm:w-8"></i>
           </div>
 
           <div class="space-y-1">
@@ -726,9 +738,9 @@
     </script>
 
     <!-- Trading Controller Script -->
-    <script src="{{ asset('js/trading.js') }}"></script>
+    <script src="/js/trading.js"></script>
 
     <!-- Client-Side Security & Anti-Inspect Protection -->
-    <script src="{{ asset('js/security.js') }}"></script>
+    <script src="/js/security.js"></script>
   </body>
 </html>

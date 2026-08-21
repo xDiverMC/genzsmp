@@ -7,6 +7,13 @@
     <meta name="description" content="{{ $serverInfo['tagline'] }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
+    <!-- Favicon & App Icons -->
+    <link rel="icon" type="image/png" href="/images/logo.png" />
+    <link rel="shortcut icon" type="image/png" href="/images/logo.png" />
+    <link rel="apple-touch-icon" href="/images/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#8b5cf6" />
+
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
@@ -133,19 +140,19 @@
         initialStatus: @json($initialStatus),
         csrfToken: "{{ csrf_token() }}",
         images: {
-          heroBg: "{{ asset('images/background.png') }}",
-          townImg: "{{ asset('images/fotbar1.png') }}",
-          dungeonImg: "{{ asset('images/fotbar2.png') }}",
-          pvpImg: "{{ asset('images/fotbar3.png') }}",
-          logoImg: "{{ asset('images/logo.png') }}"
+          heroBg: "/images/background.png",
+          townImg: "/images/fotbar1.png",
+          dungeonImg: "/images/fotbar2.png",
+          pvpImg: "/images/fotbar3.png",
+          logoImg: "/images/logo.png"
         }
       };
     </script>
 
     <!-- React Application -->
-    <script type="text/babel" src="{{ asset('js/app.js') }}"></script>
+    <script type="text/babel" src="/js/app.js"></script>
 
     <!-- Client-Side Security & Anti-Inspect Protection -->
-    <script src="{{ asset('js/security.js') }}"></script>
+    <script src="/js/security.js"></script>
   </body>
 </html>

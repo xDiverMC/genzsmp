@@ -713,6 +713,19 @@ const App = () => {
                   {link.label}
                 </a>
               ))}
+
+              {/* Web Trading Link — Below Aturan */}
+              <a
+                href="/trading"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-between rounded-xl bg-purple-500/10 border border-purple-500/30 px-4 py-3 text-sm font-bold uppercase text-purple-300 hover:bg-purple-600 hover:text-white transition-colors mt-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Icon name="TrendingUp" className="h-4 w-4 text-primary" /> Web Trading Terminal
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-200">LIVE</span>
+              </a>
+
               <div className="pt-4 border-t border-neutral-900 space-y-2">
                 <a
                   href={SERVER_INFO.discordUrl}

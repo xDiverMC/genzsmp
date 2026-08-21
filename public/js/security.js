@@ -48,11 +48,14 @@
     }
   }, true);
 
-  // 2. DISABLE RIGHT-CLICK CONTEXT MENU
+  // 2. DISABLE RIGHT-CLICK CONTEXT MENU (DESKTOP MOUSE ONLY)
   document.addEventListener('contextmenu', function (e) {
-    // Allow right click inside normal text inputs/textareas if needed, otherwise block
     const target = e.target.tagName.toLowerCase();
     if (target === 'input' || target === 'textarea') {
+      return true;
+    }
+    // Only prevent on actual mouse right clicks, don't interrupt mobile touch
+    if (e.pointerType === 'touch') {
       return true;
     }
     e.preventDefault();
@@ -71,24 +74,18 @@
   // 4. SELF-XSS CONSOLE BANNER
   function printConsoleWarning() {
     if (typeof console !== 'undefined') {
-      console.clear();
       console.log(
         '%c🛑 STOP! PERINGATAN KEAMANAN GENZSMP 🛑',
-        'color: #ef4444; font-size: 24px; font-weight: 900; text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);'
-      );
-      console.log(
-        '%cIni adalah fitur browser yang ditujukan khusus untuk pengembang. Jika seseorang menyuruh Anda menyalin dan menempelkan teks/kode di sini untuk mendapatkan keuntungan atau item in-game, ini adalah penipuan (Self-XSS attack)!',
-        'color: #facc15; font-size: 13px; font-weight: bold;'
+        'color: #ef4444; font-size: 20px; font-weight: 900;'
       );
       console.log(
         '%cSeluruh transaksi trading, saldo Vault, dan PIN 6-digit diverifikasi secara aman langsung pada server backend Laravel & SQLite.',
-        'color: #a855f7; font-size: 12px; font-style: italic;'
+        'color: #a855f7; font-size: 12px; font-weight: bold;'
       );
     }
   }
 
   printConsoleWarning();
-  setInterval(printConsoleWarning, 15000);
 
   // 5. TOAST NOTIFICATION FOR BLOCKED ACTIONS
   function notifyBlockedAction(msg) {

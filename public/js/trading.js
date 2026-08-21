@@ -31,7 +31,7 @@ const state = {
       low: 950.00,
       volume: 124500,
       changePercent: 4.08,
-      history: [950, 965, 960, 980, 1005, 1020]
+      history: [960, 972, 965, 980, 975, 990, 1010, 1005, 995, 1015, 1008, 1025, 1018, 1030, 1015, 1020]
     },
     eth: {
       symbol: 'ETH',
@@ -43,7 +43,7 @@ const state = {
       low: 480.00,
       volume: 62100,
       changePercent: -1.92,
-      history: [490, 500, 515, 508, 512, 510]
+      history: [530, 525, 528, 520, 515, 522, 518, 510, 505, 512, 508, 515, 510, 506, 514, 510]
     },
     gld: {
       symbol: 'GLD',
@@ -55,7 +55,7 @@ const state = {
       low: 98.00,
       volume: 18400,
       changePercent: 5.00,
-      history: [98, 100, 101, 103, 104, 105]
+      history: [98, 99, 101, 100, 102, 101, 103, 102, 104, 103, 105, 104, 106, 105, 104, 105]
     },
     dia: {
       symbol: 'DIA',
@@ -67,7 +67,7 @@ const state = {
       low: 240.00,
       volume: 34200,
       changePercent: -2.00,
-      history: [260, 255, 252, 250, 248, 245]
+      history: [255, 258, 252, 250, 248, 253, 249, 246, 250, 247, 244, 248, 245, 242, 246, 245]
     },
     emd: {
       symbol: 'EMD',
@@ -79,7 +79,7 @@ const state = {
       low: 160.00,
       volume: 28900,
       changePercent: 4.16,
-      history: [165, 168, 170, 172, 174, 175]
+      history: [160, 162, 165, 163, 167, 165, 169, 168, 172, 170, 174, 172, 176, 173, 177, 175]
     }
   },
   portfolio: {
@@ -119,9 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPlayer(playerParam);
   } else if (savedPlayer) {
     loginPlayer(savedPlayer);
-  } else {
-    // Show login modal for initial access
-    openLoginModal();
   }
 
   // Start periodic price pulse simulation
@@ -719,9 +716,22 @@ function initTradingChart() {
 function generateChartLabels(count) {
   const labels = [];
   const now = new Date();
+  const tf = state.timeframe || '5M';
+
+  let stepMinutes = 5;
+  if (tf === '1M') stepMinutes = 1;
+  else if (tf === '5M') stepMinutes = 5;
+  else if (tf === '15M') stepMinutes = 15;
+  else if (tf === '1H') stepMinutes = 60;
+  else if (tf === '1D') stepMinutes = 1440;
+
   for (let i = count - 1; i >= 0; i--) {
-    const t = new Date(now.getTime() - i * 5 * 60000);
-    labels.push(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
+    const t = new Date(now.getTime() - i * stepMinutes * 60000);
+    if (tf === '1D') {
+      labels.push(`${t.getDate()}/${t.getMonth() + 1}`);
+    } else {
+      labels.push(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
+    }
   }
   return labels;
 }
@@ -729,10 +739,25 @@ function generateChartLabels(count) {
 function updateChartData() {
   if (!chartInstance) return;
   const asset = state.assets[state.activeAsset];
+  const isPositive = asset.changePercent >= 0;
+
+  const ctx = chartInstance.ctx;
+  const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+  if (isPositive) {
+    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+  } else {
+    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+    gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+  }
+
   chartInstance.data.labels = generateChartLabels(asset.history.length);
   chartInstance.data.datasets[0].label = asset.name;
   chartInstance.data.datasets[0].data = [...asset.history];
-  chartInstance.update();
+  chartInstance.data.datasets[0].borderColor = isPositive ? '#10b981' : '#ef4444';
+  chartInstance.data.datasets[0].pointBackgroundColor = isPositive ? '#10b981' : '#ef4444';
+  chartInstance.data.datasets[0].backgroundColor = gradient;
+  chartInstance.update('none');
 }
 
 function setTimeframe(tf) {
@@ -741,17 +766,13 @@ function setTimeframe(tf) {
     b.classList.remove('bg-primary', 'text-white', 'font-bold', 'active');
     b.classList.add('text-neutral-400');
   });
-  event.target.classList.add('bg-primary', 'text-white', 'font-bold', 'active');
-  event.target.classList.remove('text-neutral-400');
 
-  const asset = state.assets[state.activeAsset];
-  const count = tf === '1M' ? 12 : tf === '5M' ? 10 : tf === '15M' ? 8 : tf === '1H' ? 6 : 5;
-  const base = asset.price;
-  asset.history = Array.from({ length: count }, (_, i) => {
-    const delta = (Math.random() - 0.5) * (base * 0.04);
-    return Math.round((base + delta) * 100) / 100;
-  });
-  asset.history[asset.history.length - 1] = asset.price;
+  const activeBtn = Array.from(document.querySelectorAll('.tf-btn')).find(b => b.textContent.trim() === tf);
+  if (activeBtn) {
+    activeBtn.classList.add('bg-primary', 'text-white', 'font-bold', 'active');
+    activeBtn.classList.remove('text-neutral-400');
+  }
+
   updateChartData();
 }
 
@@ -995,15 +1016,15 @@ async function loadLeaderboard() {
         const top3 = top_investors.slice(0, 3);
         const podiumCards = top3.map((inv, idx) => {
           const rankColors = [
-            { border: 'border-amber-500/50', bg: 'bg-amber-500/10', text: 'text-amber-400', icon: '👑', label: '1ST PLACE' },
-            { border: 'border-slate-400/40', bg: 'bg-slate-400/10', text: 'text-slate-300', icon: '🥈', label: '2ND PLACE' },
-            { border: 'border-amber-700/40', bg: 'bg-amber-700/10', text: 'text-amber-600', icon: '🥉', label: '3RD PLACE' }
-          ][idx] || { border: 'border-neutral-800', bg: 'bg-neutral-900', text: 'text-white', icon: '', label: '' };
+            { border: 'border-amber-500/50', bg: 'bg-amber-500/10', text: 'text-amber-400', badge: '#1 GOLD', label: '1ST PLACE' },
+            { border: 'border-slate-400/40', bg: 'bg-slate-400/10', text: 'text-slate-300', badge: '#2 SILVER', label: '2ND PLACE' },
+            { border: 'border-amber-700/40', bg: 'bg-amber-700/10', text: 'text-amber-600', badge: '#3 BRONZE', label: '3RD PLACE' }
+          ][idx] || { border: 'border-neutral-800', bg: 'bg-neutral-900', text: 'text-white', badge: '#', label: '' };
 
           return `
             <div class="p-4 rounded-2xl ${podiumCardsBg(idx)} border ${rankColors.border} relative overflow-hidden flex flex-col items-center text-center space-y-2.5 shadow-xl">
               <div class="flex items-center justify-between w-full text-[10px] font-mono font-bold">
-                <span class="${rankColors.text} flex items-center gap-1">${rankColors.icon} ${rankColors.label}</span>
+                <span class="${rankColors.text} flex items-center gap-1">${rankColors.badge} • ${rankColors.label}</span>
                 <span class="px-2 py-0.5 rounded-full bg-neutral-900/80 border border-neutral-800 text-neutral-300">${inv.badge}</span>
               </div>
 
