@@ -186,7 +186,9 @@ class TradingApiController extends Controller
 
         // 3. Process BUY / SELL Financial Logic
         $subtotal = $amount * $spotPrice;
-        $tax = $subtotal * 0.02; // 2% protocol burn tax
+        $taxRate = in_array(strtoupper($assetSymbol), ['BTC', 'ETH']) ? 0.08 : 0.05;
+        $tax = $subtotal * $taxRate;
+        $taxDisplayPercent = (int) ($taxRate * 100);
 
         $portfolio = InvestPortfolio::firstOrCreate(
             ['invest_user_id' => $user->id, 'asset' => $assetSymbol],
@@ -198,7 +200,7 @@ class TradingApiController extends Controller
             if ($user->cash_balance < $totalCost) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Saldo kas Vault tidak mencukupi! Dibutuhkan $" . number_format($totalCost, 2) . " (termasuk tax 2%). Saldo Anda: $" . number_format($user->cash_balance, 2)
+                    'message' => "Saldo kas Vault tidak mencukupi! Dibutuhkan $" . number_format($totalCost, 2) . " (termasuk tax {$taxDisplayPercent}%). Saldo Anda: $" . number_format($user->cash_balance, 2)
                 ], 400);
             }
 

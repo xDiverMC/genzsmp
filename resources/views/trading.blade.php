@@ -240,7 +240,7 @@
             <span class="mx-6"><strong class="text-cyan-400">[MINING]</strong> Diamond Mining Spike: Pasokan DIA stabil di level $245</span>
             <span class="mx-6"><strong class="text-amber-400">[SECURITY]</strong> Sistem PIN Keamanan: Transaksi Buy/Sell dijamin aman dengan 6-digit PIN in-game</span>
             <span class="mx-6"><strong class="text-purple-400">[LIQUIDITY]</strong> ETH Smart Economy: Likuiditas likuid di pasar in-game GenzSMP</span>
-            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> 2% burn tax diterapkan otomatis pada setiap penjualan aset</span>
+            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> Pajak protokol: 8% (BTC/ETH) & 5% (GLD/DIA/EMD) otomatis diterapkan pada transaksi aset</span>
             <span class="mx-6"><strong class="text-emerald-400">[ANTI-WHALE]</strong> Rate-limit 5 detik melindungi stabilitas likuiditas pasar</span>
           </div>
         </div>
@@ -543,7 +543,7 @@
                   <span id="summary-subtotal" class="text-white">$0.00</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-neutral-500">Protocol Tax (2%):</span>
+                  <span id="summary-tax-label" class="text-neutral-500">Protocol Tax (8%):</span>
                   <span id="summary-tax" class="text-yellow-400">$0.00</span>
                 </div>
                 <div class="h-px bg-neutral-900 my-1"></div>

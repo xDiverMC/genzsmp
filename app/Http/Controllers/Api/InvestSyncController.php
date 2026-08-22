@@ -176,7 +176,8 @@ class InvestSyncController extends Controller
         }
 
         $subtotal = $amount * $price;
-        $tax = $subtotal * 0.02;
+        $taxRate = in_array(strtoupper($asset), ['BTC', 'ETH']) ? 0.08 : 0.05;
+        $tax = $subtotal * $taxRate;
         $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
 
         $portfolio = InvestPortfolio::firstOrCreate(

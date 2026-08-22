@@ -30,6 +30,7 @@ const state = {
       high: 1080.00,
       low: 950.00,
       volume: 124500,
+      tax_percent: 8.0,
       changePercent: 4.08,
       history: [960, 972, 965, 980, 975, 990, 1010, 1005, 995, 1015, 1008, 1025, 1018, 1030, 1015, 1020]
     },
@@ -42,6 +43,7 @@ const state = {
       high: 540.00,
       low: 480.00,
       volume: 62100,
+      tax_percent: 8.0,
       changePercent: -1.92,
       history: [530, 525, 528, 520, 515, 522, 518, 510, 505, 512, 508, 515, 510, 506, 514, 510]
     },
@@ -54,6 +56,7 @@ const state = {
       high: 110.00,
       low: 98.00,
       volume: 18400,
+      tax_percent: 5.0,
       changePercent: 5.00,
       history: [98, 99, 101, 100, 102, 101, 103, 102, 104, 103, 105, 104, 106, 105, 104, 105]
     },
@@ -66,6 +69,7 @@ const state = {
       high: 260.00,
       low: 240.00,
       volume: 34200,
+      tax_percent: 5.0,
       changePercent: -2.00,
       history: [255, 258, 252, 250, 248, 253, 249, 246, 250, 247, 244, 248, 245, 242, 246, 245]
     },
@@ -78,6 +82,7 @@ const state = {
       high: 190.00,
       low: 160.00,
       volume: 28900,
+      tax_percent: 5.0,
       changePercent: 4.16,
       history: [160, 162, 165, 163, 167, 165, 169, 168, 172, 170, 174, 172, 176, 173, 177, 175]
     }
@@ -334,6 +339,13 @@ function updateUserProfileUI() {
   }
 }
 
+function getAssetTaxRate(assetKey) {
+  const key = (assetKey || state.activeAsset || '').toLowerCase();
+  const asset = state.assets[key];
+  if (asset && asset.tax_percent) return asset.tax_percent / 100;
+  return (key === 'btc' || key === 'eth') ? 0.08 : 0.05;
+}
+
 // =======================================================
 //   6-DIGIT PIN SECURITY MODAL & TRADE EXECUTION
 // =======================================================
@@ -366,8 +378,9 @@ function promptPinModal(e) {
     return;
   }
 
+  const taxRate = getAssetTaxRate(assetKey);
   const subtotal = amount * asset.price;
-  const tax = subtotal * 0.02;
+  const tax = subtotal * taxRate;
   const total = state.activeTradeType === 'BUY' ? subtotal + tax : subtotal - tax;
 
   if (state.activeTradeType === 'BUY' && state.session.cashBalance < total) {
@@ -834,7 +847,8 @@ function setPercentageAmount(pct) {
 
   if (state.activeTradeType === 'BUY') {
     const totalCash = state.session.cashBalance;
-    const maxBuyAmount = totalCash / (asset.price * 1.02); // 2% tax
+    const taxRate = getAssetTaxRate(state.activeAsset);
+    const maxBuyAmount = totalCash / (asset.price * (1 + taxRate));
     const amount = Math.floor(maxBuyAmount * pct * 100) / 100;
     input.value = Math.min(amount, 1000) > 0 ? Math.min(amount, 1000) : '';
   } else {
@@ -851,9 +865,14 @@ function calculateTradeCost() {
   const amount = parseFloat(input.value) || 0;
   const asset = state.assets[state.activeAsset];
 
+  const taxRate = getAssetTaxRate(state.activeAsset);
+  const taxPercent = Math.round(taxRate * 100);
   const subtotal = amount * asset.price;
-  const tax = subtotal * 0.02;
+  const tax = subtotal * taxRate;
   const total = state.activeTradeType === 'BUY' ? subtotal + tax : subtotal - tax;
+
+  const taxLabel = document.getElementById('summary-tax-label');
+  if (taxLabel) taxLabel.textContent = `Protocol Tax (${taxPercent}%):`;
 
   document.getElementById('summary-subtotal').textContent = `$${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
   document.getElementById('summary-tax').textContent = `$${tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;

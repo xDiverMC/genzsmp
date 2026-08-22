@@ -261,7 +261,7 @@ return [
     'trading' => [
         'ws_port' => (int) env('ARQOINVEST_WS_PORT', 8088),
         'ws_host' => env('ARQOINVEST_WS_HOST', '178.128.105.129'),
-        'tax_percent' => 2.0,
+        'tax_percent' => 8.0,
         'cooldown_seconds' => 5,
         'session_ttl_seconds' => 900,
         'assets' => [
@@ -274,6 +274,7 @@ return [
                 'initial_price' => 1020,
                 'min_price' => 500,
                 'max_price' => 100000,
+                'tax_percent' => 8.0,
                 'description' => 'Aset crypto terkemuka dengan kapitalisasi pasar terbesar di GenzSMP.'
             ],
             'eth' => [
@@ -285,6 +286,7 @@ return [
                 'initial_price' => 510,
                 'min_price' => 250,
                 'max_price' => 50000,
+                'tax_percent' => 8.0,
                 'description' => 'Platform smart contract dan aset desentralisasi utilitas tinggi.'
             ],
             'gld' => [
@@ -296,6 +298,7 @@ return [
                 'initial_price' => 105,
                 'min_price' => 50,
                 'max_price' => 5000,
+                'tax_percent' => 5.0,
                 'description' => 'Komoditas emas fisik stabil dengan risiko volatilitas rendah.'
             ],
             'dia' => [
@@ -307,6 +310,7 @@ return [
                 'initial_price' => 245,
                 'min_price' => 100,
                 'max_price' => 10000,
+                'tax_percent' => 5.0,
                 'description' => 'Aset permata berharga hasil tambang dalam dengan permintaan tinggi.'
             ],
             'emd' => [
@@ -318,6 +322,7 @@ return [
                 'initial_price' => 175,
                 'min_price' => 80,
                 'max_price' => 8000,
+                'tax_percent' => 5.0,
                 'description' => 'Mata uang barter villager dengan likuiditas tinggi di pasar global.'
             ],
         ]
