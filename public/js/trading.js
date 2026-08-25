@@ -74,6 +74,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPlayer(savedPlayer);
   }
 
+  // Load saved chart style preference (Candle or Classic Line Chart)
+  const savedChartStyle = localStorage.getItem('genzsmp_chart_style') || 'candle';
+  if (savedChartStyle === 'line') {
+    setChartStyle('line');
+  }
+
   // Poll server market data every 3 seconds for uniform server prices & candles
   fetchMarketData();
   setInterval(fetchMarketData, 3000);
@@ -204,32 +210,82 @@ function initChartJsFallback() {
   }
 
   const asset = state.assets[state.activeAsset];
-  const isUp = asset.changePercent >= 0;
-  const gradientColor = isUp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+  const isUp = (asset && asset.changePercent >= 0);
+  const gradientColor = isUp ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
   const lineColor = isUp ? '#10B981' : '#EF4444';
+
+  const sym = asset ? asset.symbol : 'BTC';
+  const rawCandles = state.candles[sym] || [];
+  let labels = [];
+  let dataPoints = [];
+
+  if (rawCandles.length > 0) {
+    labels = rawCandles.map(c => {
+      const d = new Date(c.time * 1000);
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    });
+    dataPoints = rawCandles.map(c => c.close);
+  } else {
+    labels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+    dataPoints = [asset.price * 0.98, asset.price * 0.99, asset.price * 0.985, asset.price * 1.01, asset.price];
+  }
 
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16'],
+      labels: labels,
       datasets: [{
-        label: asset.symbol + ' Price',
-        data: [asset.price * 0.98, asset.price * 0.99, asset.price * 0.985, asset.price * 1.01, asset.price],
+        label: asset.symbol + ' Price ($)',
+        data: dataPoints,
         borderColor: lineColor,
         backgroundColor: gradientColor,
         borderWidth: 2.5,
         fill: true,
         tension: 0.35,
         pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: lineColor,
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      interaction: {
+        intersect: false,
+        mode: 'index',
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0a0a0a',
+          titleColor: '#fff',
+          bodyColor: isUp ? '#34d399' : '#f87171',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            label: function(context) {
+              return asset.symbol + ': $' + parseFloat(context.parsed.y).toFixed(2);
+            }
+          }
+        }
+      },
       scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.03)' } },
-        y: { grid: { color: 'rgba(255,255,255,0.03)' } }
+        x: {
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          ticks: { color: '#9ca3af', font: { family: 'JetBrains Mono', size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          ticks: {
+            color: '#9ca3af',
+            font: { family: 'JetBrains Mono', size: 10 },
+            callback: function(value) { return '$' + value; }
+          }
+        }
       }
     }
   });
@@ -238,6 +294,29 @@ function initChartJsFallback() {
 function updateChartData() {
   const sym = state.assets[state.activeAsset].symbol;
   const rawCandles = state.candles[sym] || [];
+
+  if (state.chartStyle === 'line') {
+    if (chartInstance && rawCandles.length > 0) {
+      const labels = rawCandles.map(c => {
+        const d = new Date(c.time * 1000);
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      });
+      const dataPoints = rawCandles.map(c => c.close);
+      const isUp = (state.assets[state.activeAsset] && state.assets[state.activeAsset].changePercent >= 0);
+      const lineColor = isUp ? '#10B981' : '#EF4444';
+      const gradientColor = isUp ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+
+      chartInstance.data.labels = labels;
+      chartInstance.data.datasets[0].data = dataPoints;
+      chartInstance.data.datasets[0].borderColor = lineColor;
+      chartInstance.data.datasets[0].backgroundColor = gradientColor;
+      chartInstance.data.datasets[0].pointHoverBackgroundColor = lineColor;
+      chartInstance.update('none');
+    } else {
+      initChartJsFallback();
+    }
+    return;
+  }
 
   if (tvCandleSeries && rawCandles.length > 0) {
     try {
@@ -278,24 +357,34 @@ function setTimeframe(tf) {
 
 function setChartStyle(style) {
   state.chartStyle = style;
+  localStorage.setItem('genzsmp_chart_style', style);
   const candleBtn = document.getElementById('chart-style-candle');
   const lineBtn = document.getElementById('chart-style-line');
   const tvWrapper = document.getElementById('tv-chart-container');
   const chartJsWrapper = document.getElementById('chartjs-container');
 
   if (style === 'candle') {
-    if (candleBtn) { candleBtn.className = 'px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition'; }
-    if (lineBtn) { lineBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition'; }
+    if (candleBtn) {
+      candleBtn.className = 'px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold flex items-center gap-1.5 transition shadow-md shadow-purple-500/20 cursor-pointer';
+    }
+    if (lineBtn) {
+      lineBtn.className = 'px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer';
+    }
     if (tvWrapper) tvWrapper.classList.remove('hidden');
     if (chartJsWrapper) chartJsWrapper.classList.add('hidden');
     if (tvCandleSeries) updateChartData();
   } else {
-    if (lineBtn) { lineBtn.className = 'px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition'; }
-    if (candleBtn) { candleBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition'; }
+    if (lineBtn) {
+      lineBtn.className = 'px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold flex items-center gap-1.5 transition shadow-md shadow-purple-500/20 cursor-pointer';
+    }
+    if (candleBtn) {
+      candleBtn.className = 'px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer';
+    }
     if (tvWrapper) tvWrapper.classList.add('hidden');
     if (chartJsWrapper) chartJsWrapper.classList.remove('hidden');
     initChartJsFallback();
   }
+  if (window.lucide) lucide.createIcons();
 }
 
 // =======================================================

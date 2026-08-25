@@ -344,13 +344,15 @@
                 <button onclick="setTimeframe('1d')" id="tf-1d" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
               </div>
 
-              <!-- Chart Style Selector: Candlestick vs Line -->
+              <!-- Chart Style Selector: Candlestick vs Chart Lama (Garis) -->
               <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
-                <button onclick="setChartStyle('candle')" id="chart-style-candle" class="px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition">
-                  <i data-lucide="candlestick-chart" class="h-3.5 w-3.5"></i> Candle (OHLC)
+                <button onclick="setChartStyle('candle')" id="chart-style-candle" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold flex items-center gap-1.5 transition shadow-md shadow-purple-500/20 cursor-pointer">
+                  <i data-lucide="candlestick-chart" class="h-3.5 w-3.5"></i>
+                  <span>Candlestick (Pro)</span>
                 </button>
-                <button onclick="setChartStyle('line')" id="chart-style-line" class="px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition">
-                  <i data-lucide="line-chart" class="h-3.5 w-3.5"></i> Line
+                <button onclick="setChartStyle('line')" id="chart-style-line" class="px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
+                  <i data-lucide="trending-up" class="h-3.5 w-3.5"></i>
+                  <span>Chart Lama (Garis)</span>
                 </button>
               </div>
 
