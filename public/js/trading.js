@@ -1,5 +1,5 @@
 // =======================================================
-//   GENZSMP WEB TRADING CONTROLLER & PIN SECURITY ENGINE
+//   GENZSMP WEB TRADING CONTROLLER & ENGINE PRO
 // =======================================================
 
 const CONFIG = window.TRADING_CONFIG || {};
@@ -15,77 +15,19 @@ const state = {
     expireSeconds: CONFIG.sessionTtlSeconds || 900
   },
   activeAsset: 'btc',
-  activeTradeType: 'BUY',
-  timeframe: '5M',
+  activeTradeType: 'BUY', // BUY or SELL
+  orderMode: 'MARKET',    // MARKET or LIMIT
+  chartStyle: 'candle',   // candle or line
+  timeframe: '5m',        // 1m, 5m, 15m, 1h, 1d
   cooldownActive: false,
   cooldownRemaining: 0,
-  pendingTrade: null, // holds order details waiting for PIN confirmation
+  pendingTrade: null,
   assets: {
-    btc: {
-      symbol: 'BTC',
-      name: 'Bitcoin',
-      category: 'Crypto',
-      price: 1020.00,
-      openPrice: 980.00,
-      high: 1080.00,
-      low: 950.00,
-      volume: 124500,
-      tax_percent: 8.0,
-      changePercent: 4.08,
-      history: [960, 972, 965, 980, 975, 990, 1010, 1005, 995, 1015, 1008, 1025, 1018, 1030, 1015, 1020]
-    },
-    eth: {
-      symbol: 'ETH',
-      name: 'Ethereum',
-      category: 'Crypto',
-      price: 510.00,
-      openPrice: 520.00,
-      high: 540.00,
-      low: 480.00,
-      volume: 62100,
-      tax_percent: 8.0,
-      changePercent: -1.92,
-      history: [530, 525, 528, 520, 515, 522, 518, 510, 505, 512, 508, 515, 510, 506, 514, 510]
-    },
-    gld: {
-      symbol: 'GLD',
-      name: 'Gold Ingot',
-      category: 'Commodity',
-      price: 105.00,
-      openPrice: 100.00,
-      high: 110.00,
-      low: 98.00,
-      volume: 18400,
-      tax_percent: 5.0,
-      changePercent: 5.00,
-      history: [98, 99, 101, 100, 102, 101, 103, 102, 104, 103, 105, 104, 106, 105, 104, 105]
-    },
-    dia: {
-      symbol: 'DIA',
-      name: 'Diamond Gem',
-      category: 'Commodity',
-      price: 245.00,
-      openPrice: 250.00,
-      high: 260.00,
-      low: 240.00,
-      volume: 34200,
-      tax_percent: 5.0,
-      changePercent: -2.00,
-      history: [255, 258, 252, 250, 248, 253, 249, 246, 250, 247, 244, 248, 245, 242, 246, 245]
-    },
-    emd: {
-      symbol: 'EMD',
-      name: 'Emerald Shard',
-      category: 'Commodity',
-      price: 175.00,
-      openPrice: 168.00,
-      high: 190.00,
-      low: 160.00,
-      volume: 28900,
-      tax_percent: 5.0,
-      changePercent: 4.16,
-      history: [160, 162, 165, 163, 167, 165, 169, 168, 172, 170, 174, 172, 176, 173, 177, 175]
-    }
+    btc: { symbol: 'BTC', name: 'Bitcoin', category: 'Crypto', price: 1020.00, openPrice: 1020.00, high: 1080.00, low: 950.00, volume: 124500, tax_percent: 8.0, changePercent: 0.00 },
+    eth: { symbol: 'ETH', name: 'Ethereum', category: 'Crypto', price: 510.00, openPrice: 510.00, high: 540.00, low: 480.00, volume: 62100, tax_percent: 8.0, changePercent: 0.00 },
+    gld: { symbol: 'GLD', name: 'Gold Ingot', category: 'Commodity', price: 105.00, openPrice: 105.00, high: 110.00, low: 98.00, volume: 18400, tax_percent: 5.0, changePercent: 0.00 },
+    dia: { symbol: 'DIA', name: 'Diamond Gem', category: 'Commodity', price: 245.00, openPrice: 245.00, high: 260.00, low: 240.00, volume: 34200, tax_percent: 5.0, changePercent: 0.00 },
+    emd: { symbol: 'EMD', name: 'Emerald Shard', category: 'Commodity', price: 175.00, openPrice: 175.00, high: 190.00, low: 160.00, volume: 28900, tax_percent: 5.0, changePercent: 0.00 }
   },
   portfolio: {
     btc: { amount: 0, avgBuyPrice: 0 },
@@ -94,10 +36,16 @@ const state = {
     dia: { amount: 0, avgBuyPrice: 0 },
     emd: { amount: 0, avgBuyPrice: 0 }
   },
+  candles: {},
+  limitOrders: [],
+  priceAlerts: [],
   tradeLogs: []
 };
 
-let chartInstance = null;
+let tvChart = null;
+let tvCandleSeries = null;
+let tvVolumeSeries = null;
+let chartInstance = null; // Chart.js fallback
 let cooldownTimer = null;
 
 // =======================================================
@@ -110,19 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderAssetList();
   updateActiveAssetDisplay();
-  initTradingChart();
+  initTradingViewChart();
   renderPortfolioTable();
   renderOrderbook();
   calculateTradeCost();
-
-  // Bind login trigger button click
-  const loginTrigger = document.getElementById('login-trigger-btn');
-  if (loginTrigger) {
-    loginTrigger.addEventListener('click', (e) => {
-      e.preventDefault();
-      openLoginModal();
-    });
-  }
 
   // Check login: URL query param or saved localStorage
   const urlParams = new URLSearchParams(window.location.search);
@@ -135,12 +74,232 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPlayer(savedPlayer);
   }
 
-  // Start periodic price pulse simulation
-  setInterval(simulateMicroPriceMovements, 4000);
+  // Poll server market data every 3 seconds for uniform server prices & candles
+  fetchMarketData();
+  setInterval(fetchMarketData, 3000);
 });
 
 // =======================================================
-//   AUTHENTICATION & USERNAME LOGIN
+//   MARKET DATA & LIVE SERVER SYNC
+// =======================================================
+async function fetchMarketData() {
+  try {
+    const res = await fetch('/api/trading/market-data?timeframe=' + state.timeframe);
+    const json = await res.json();
+    if (json.success && json.data) {
+      const data = json.data;
+      
+      // Update spot prices and 24h stats
+      if (data.prices) {
+        for (const [sym, price] of Object.entries(data.prices)) {
+          const key = sym.toLowerCase();
+          if (state.assets[key]) {
+            state.assets[key].price = price;
+            if (data.stats && data.stats[sym]) {
+              const st = data.stats[sym];
+              state.assets[key].openPrice = st.open;
+              state.assets[key].high = st.high;
+              state.assets[key].low = st.low;
+              state.assets[key].volume = st.volume;
+              state.assets[key].changePercent = st.change_pct;
+            }
+          }
+        }
+      }
+
+      // Update candles
+      if (data.candles) {
+        state.candles = data.candles;
+        updateChartData();
+      }
+
+      renderAssetList();
+      updateActiveAssetDisplay();
+      calculateTradeCost();
+      renderPortfolioTable();
+      renderOrderbook();
+    }
+  } catch (e) {
+    // console.warn('Market data fetch error:', e);
+  }
+}
+
+// =======================================================
+//   TRADINGVIEW LIGHTWEIGHT CHARTS / CHART.JS
+// =======================================================
+function initTradingViewChart() {
+  const container = document.getElementById('tv-chart-container');
+  if (!container) return;
+
+  if (window.LightweightCharts) {
+    try {
+      container.innerHTML = '';
+      tvChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth || 600,
+        height: 370,
+        layout: {
+          background: { color: 'transparent' },
+          textColor: '#9ca3af',
+          fontSize: 11,
+          fontFamily: 'JetBrains Mono, monospace',
+        },
+        grid: {
+          vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+          horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+        },
+        crosshair: {
+          mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+        },
+        timeScale: {
+          borderColor: 'rgba(255, 255, 255, 0.1)',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
+
+      tvCandleSeries = tvChart.addCandlestickSeries({
+        upColor: '#10B981',
+        downColor: '#EF4444',
+        borderDownColor: '#EF4444',
+        borderUpColor: '#10B981',
+        wickDownColor: '#EF4444',
+        wickUpColor: '#10B981',
+      });
+
+      tvVolumeSeries = tvChart.addHistogramSeries({
+        color: '#8b5cf6',
+        priceFormat: { type: 'volume' },
+        priceScaleId: '',
+        scaleMargins: { top: 0.8, bottom: 0 },
+      });
+
+      window.addEventListener('resize', () => {
+        if (tvChart && container) {
+          tvChart.applyOptions({ width: container.clientWidth });
+        }
+      });
+    } catch (err) {
+      console.warn('LightweightCharts init failed, using Chart.js fallback', err);
+      initChartJsFallback();
+    }
+  } else {
+    initChartJsFallback();
+  }
+}
+
+function initChartJsFallback() {
+  const chartWrapper = document.getElementById('chartjs-container');
+  const tvWrapper = document.getElementById('tv-chart-container');
+  if (chartWrapper) chartWrapper.classList.remove('hidden');
+  if (tvWrapper) tvWrapper.classList.add('hidden');
+
+  const ctx = document.getElementById('tradingChart');
+  if (!ctx) return;
+
+  if (chartInstance) {
+    chartInstance.destroy();
+  }
+
+  const asset = state.assets[state.activeAsset];
+  const isUp = asset.changePercent >= 0;
+  const gradientColor = isUp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+  const lineColor = isUp ? '#10B981' : '#EF4444';
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16'],
+      datasets: [{
+        label: asset.symbol + ' Price',
+        data: [asset.price * 0.98, asset.price * 0.99, asset.price * 0.985, asset.price * 1.01, asset.price],
+        borderColor: lineColor,
+        backgroundColor: gradientColor,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.03)' } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' } }
+      }
+    }
+  });
+}
+
+function updateChartData() {
+  const sym = state.assets[state.activeAsset].symbol;
+  const rawCandles = state.candles[sym] || [];
+
+  if (tvCandleSeries && rawCandles.length > 0) {
+    try {
+      const candleData = rawCandles.map(c => ({
+        time: c.time,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close
+      }));
+      tvCandleSeries.setData(candleData);
+
+      if (tvVolumeSeries) {
+        const volumeData = rawCandles.map(c => ({
+          time: c.time,
+          value: c.volume,
+          color: c.close >= c.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'
+        }));
+        tvVolumeSeries.setData(volumeData);
+      }
+    } catch (e) {}
+  }
+}
+
+function setTimeframe(tf) {
+  state.timeframe = tf;
+  document.querySelectorAll('.tf-btn').forEach(btn => {
+    btn.classList.remove('active', 'bg-primary', 'text-white', 'font-bold');
+    btn.classList.add('text-neutral-400');
+  });
+  const activeBtn = document.getElementById('tf-' + tf.toLowerCase());
+  if (activeBtn) {
+    activeBtn.classList.add('active', 'bg-primary', 'text-white', 'font-bold');
+    activeBtn.classList.remove('text-neutral-400');
+  }
+  fetchMarketData();
+}
+
+function setChartStyle(style) {
+  state.chartStyle = style;
+  const candleBtn = document.getElementById('chart-style-candle');
+  const lineBtn = document.getElementById('chart-style-line');
+  const tvWrapper = document.getElementById('tv-chart-container');
+  const chartJsWrapper = document.getElementById('chartjs-container');
+
+  if (style === 'candle') {
+    if (candleBtn) { candleBtn.className = 'px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition'; }
+    if (lineBtn) { lineBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition'; }
+    if (tvWrapper) tvWrapper.classList.remove('hidden');
+    if (chartJsWrapper) chartJsWrapper.classList.add('hidden');
+    if (tvCandleSeries) updateChartData();
+  } else {
+    if (lineBtn) { lineBtn.className = 'px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition'; }
+    if (candleBtn) { candleBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition'; }
+    if (tvWrapper) tvWrapper.classList.add('hidden');
+    if (chartJsWrapper) chartJsWrapper.classList.remove('hidden');
+    initChartJsFallback();
+  }
+}
+
+// =======================================================
+//   AUTHENTICATION & LOGIN
 // =======================================================
 function openLoginModal() {
   const modal = document.getElementById('login-modal');
@@ -150,11 +309,10 @@ function openLoginModal() {
     modal.classList.add('flex');
     if (input) {
       input.value = state.session.playerName || '';
-      setTimeout(() => input.focus(), 100);
+      input.focus();
     }
   }
 }
-window.openLoginModal = openLoginModal;
 
 function closeLoginModal() {
   const modal = document.getElementById('login-modal');
@@ -163,44 +321,23 @@ function closeLoginModal() {
     modal.classList.remove('flex');
   }
 }
-window.closeLoginModal = closeLoginModal;
 
 async function handleLoginSubmit(e) {
   e.preventDefault();
   const input = document.getElementById('login-username-input');
-  const errorBox = document.getElementById('login-error-msg');
-  const errorText = document.getElementById('login-error-text');
+  if (!input) return;
   const username = input.value.trim();
-
   if (!username) return;
 
-  if (errorBox) errorBox.classList.add('hidden');
-
   const btn = document.getElementById('login-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Memverifikasi Gamertag...';
+  if (btn) btn.disabled = true;
 
-  try {
-    const success = await loginPlayer(username, true);
-    if (success) {
-      closeLoginModal();
-    }
-  } catch (err) {
-    if (errorBox && errorText) {
-      errorText.textContent = 'Terjadi kesalahan saat menghubungkan ke server.';
-      errorBox.classList.remove('hidden');
-    }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Masuk & Buka Portofolio';
-  }
+  await loginPlayer(username);
+  if (btn) btn.disabled = false;
+  closeLoginModal();
 }
 
-async function loginPlayer(playerName, fromModal = false) {
-  const errorBox = document.getElementById('login-error-msg');
-  const errorText = document.getElementById('login-error-text');
-  const modal = document.getElementById('login-modal');
-
+async function loginPlayer(username) {
   try {
     const res = await fetch('/api/trading/login', {
       method: 'POST',
@@ -208,7 +345,7 @@ async function loginPlayer(playerName, fromModal = false) {
         'Content-Type': 'application/json',
         'X-CSRF-TOKEN': CONFIG.csrfToken || ''
       },
-      body: JSON.stringify({ player_name: playerName })
+      body: JSON.stringify({ player_name: username })
     });
 
     const json = await res.json();
@@ -221,398 +358,92 @@ async function loginPlayer(playerName, fromModal = false) {
       state.session.hasPin = u.has_pin;
       state.session.cashBalance = u.cash_balance;
 
-      // Save to localStorage for seamless re-visits
       localStorage.setItem('genzsmp_trading_player', u.player_name);
 
-      // Load Portfolios
+      // Populate portfolio
       if (json.data.portfolio) {
-        Object.keys(json.data.portfolio).forEach(k => {
-          if (state.portfolio[k]) {
-            state.portfolio[k].amount = json.data.portfolio[k][0] || 0;
-            state.portfolio[k].avgBuyPrice = json.data.portfolio[k][1] || 0;
+        for (const [assetKey, val] of Object.entries(json.data.portfolio)) {
+          if (state.portfolio[assetKey]) {
+            state.portfolio[assetKey].amount = parseFloat(val[0]) || 0;
+            state.portfolio[assetKey].avgBuyPrice = parseFloat(val[1]) || 0;
           }
-        });
+        }
       }
 
-      // Load Trade Logs
-      if (json.data.trades && Array.isArray(json.data.trades)) {
-        state.tradeLogs = json.data.trades.map(t => {
-          const d = new Date(t.created_at);
-          return {
-            time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`,
-            type: t.trade_type,
-            asset: t.asset,
-            amount: t.amount,
-            price: t.price,
-            total: t.total
-          };
-        });
+      // Populate trade logs
+      if (json.data.trades) {
+        state.tradeLogs = json.data.trades;
+        renderTradeHistory();
       }
 
-      updateUserProfileUI();
+      updateUserUI();
       renderPortfolioTable();
-      renderTradeHistory();
       calculateTradeCost();
-
-      if (fromModal) {
-        showToast(`Selamat datang ${u.player_name}! Portofolio aktif.`, 'success');
-      }
-      return true;
+      loadLimitOrders();
+      loadPriceAlerts();
+      showToast('success', 'Selamat datang di Trading Terminal, ' + u.player_name + '!');
     } else {
-      // Login failed / Player not registered
-      if (errorBox && errorText) {
-        errorText.textContent = json.message || `Akun '${playerName}' belum terdaftar di sistem. Silakan atur PIN in-game via /invest setpin <6-digit> terlebih dahulu.`;
-        errorBox.classList.remove('hidden');
-      }
-
-      if (modal) {
-        modal.classList.add('animate-shake');
-        setTimeout(() => modal.classList.remove('animate-shake'), 400);
-      }
-
-      if (!fromModal) {
-        localStorage.removeItem('genzsmp_trading_player');
-      } else {
-        showToast(json.message || 'Akun tidak terdaftar!', 'danger');
-      }
-      return false;
+      showToast('error', json.message || 'Gagal login.');
     }
   } catch (err) {
-    console.error('Error logging in:', err);
-    if (errorBox && errorText) {
-      errorText.textContent = 'Terjadi kesalahan koneksi ke backend.';
-      errorBox.classList.remove('hidden');
-    }
-    return false;
+    showToast('error', 'Koneksi ke backend server gagal.');
   }
 }
 
-function updateUserProfileUI() {
+function updateUserUI() {
   const profileBar = document.getElementById('player-profile-bar');
-  const loginBtn = document.getElementById('login-trigger-btn');
+  const loginTrigger = document.getElementById('login-trigger-btn');
   const nameDisplay = document.getElementById('player-name-display');
-  const bedrockBadge = document.getElementById('player-bedrock-badge');
   const cashDisplay = document.getElementById('player-cash-display');
+  const bedrockBadge = document.getElementById('player-bedrock-badge');
   const pinBadge = document.getElementById('pin-status-badge');
 
   if (state.session.isLoggedIn) {
-    if (profileBar) {
-      profileBar.classList.remove('hidden');
-      profileBar.classList.add('flex');
-    }
-    if (loginBtn) loginBtn.classList.add('hidden');
-
+    if (profileBar) { profileBar.classList.remove('hidden'); profileBar.classList.add('flex'); }
+    if (loginTrigger) loginTrigger.classList.add('hidden');
     if (nameDisplay) nameDisplay.textContent = state.session.playerName;
-    
+    if (cashDisplay) cashDisplay.textContent = formatCurrency(state.session.cashBalance);
     if (bedrockBadge) {
-      if (state.session.isBedrock || state.session.playerName.startsWith('.')) {
-        bedrockBadge.classList.remove('hidden');
-      } else {
-        bedrockBadge.classList.add('hidden');
-      }
+      if (state.session.isBedrock) bedrockBadge.classList.remove('hidden');
+      else bedrockBadge.classList.add('hidden');
     }
-
-    if (cashDisplay) {
-      cashDisplay.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    }
-
     if (pinBadge) {
-      if (state.session.hasPin) {
-        pinBadge.className = 'text-[9px] font-mono text-emerald-400 font-bold';
-        pinBadge.textContent = '● PIN: Aktif';
-      } else {
-        pinBadge.className = 'text-[9px] font-mono text-amber-400 font-bold';
-        pinBadge.textContent = '● PIN: Belum Diatur';
-      }
+      pinBadge.textContent = state.session.hasPin ? '● PIN: Aktif' : '● PIN: Belum Diatur';
+      pinBadge.className = state.session.hasPin ? 'hidden sm:inline text-[9px] font-mono text-emerald-400' : 'hidden sm:inline text-[9px] font-mono text-amber-400';
     }
   } else {
-    if (profileBar) {
-      profileBar.classList.add('hidden');
-      profileBar.classList.remove('flex');
-    }
-    if (loginBtn) loginBtn.classList.remove('hidden');
+    if (profileBar) { profileBar.classList.add('hidden'); profileBar.classList.remove('flex'); }
+    if (loginTrigger) loginTrigger.classList.remove('hidden');
   }
-
-  updateBalanceDisplays();
-  if (window.lucide) {
-    lucide.createIcons();
-  }
-}
-
-function getAssetTaxRate(assetKey) {
-  const key = (assetKey || state.activeAsset || '').toLowerCase();
-  const asset = state.assets[key];
-  if (asset && asset.tax_percent) return asset.tax_percent / 100;
-  return (key === 'btc' || key === 'eth') ? 0.08 : 0.05;
 }
 
 // =======================================================
-//   6-DIGIT PIN SECURITY MODAL & TRADE EXECUTION
-// =======================================================
-function promptPinModal(e) {
-  e.preventDefault();
-
-  if (!state.session.isLoggedIn) {
-    showToast('Silakan masuk dengan akun Minecraft terlebih dahulu!', 'danger');
-    openLoginModal();
-    return;
-  }
-
-  if (state.cooldownActive) {
-    showToast(`Tunggu Anti-Whale cooldown (${state.cooldownRemaining}s)!`, 'danger');
-    return;
-  }
-
-  const input = document.getElementById('trade-amount-input');
-  const amount = parseFloat(input.value);
-  const assetKey = state.activeAsset;
-  const asset = state.assets[assetKey];
-
-  if (!amount || amount <= 0) {
-    showToast('Masukkan jumlah unit transaksi yang valid!', 'danger');
-    return;
-  }
-
-  if (amount > 1000) {
-    showToast('Maksimal order 1,000 unit per transaksi!', 'danger');
-    return;
-  }
-
-  const taxRate = getAssetTaxRate(assetKey);
-  const subtotal = amount * asset.price;
-  const tax = subtotal * taxRate;
-  const total = state.activeTradeType === 'BUY' ? subtotal + tax : subtotal - tax;
-
-  if (state.activeTradeType === 'BUY' && state.session.cashBalance < total) {
-    showToast(`Saldo kas Vault tidak cukup! Total dibutuhkan: $${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'danger');
-    return;
-  }
-
-  if (state.activeTradeType === 'SELL') {
-    const owned = state.portfolio[assetKey]?.amount || 0;
-    if (owned < amount) {
-      showToast(`Jumlah ${asset.symbol} tidak cukup! Kamu hanya memiliki ${owned.toFixed(2)} ${asset.symbol}.`, 'danger');
-      return;
-    }
-  }
-
-  // Save pending order details
-  state.pendingTrade = {
-    tradeType: state.activeTradeType,
-    assetKey: assetKey,
-    assetSymbol: asset.symbol,
-    amount: amount,
-    price: asset.price,
-    total: total
-  };
-
-  // Populate PIN Modal UI
-  const pinModal = document.getElementById('pin-modal');
-  const summaryAction = document.getElementById('pin-summary-action');
-  const summaryTotal = document.getElementById('pin-summary-total');
-  const summaryPlayer = document.getElementById('pin-summary-player');
-  const pinInput = document.getElementById('pin-input');
-  const pinError = document.getElementById('pin-error-msg');
-  const notSetNotice = document.getElementById('pin-not-set-notice');
-  const confirmBtn = document.getElementById('pin-confirm-btn');
-
-  summaryAction.textContent = `${state.activeTradeType} ${amount} ${asset.symbol}`;
-  summaryTotal.textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  summaryPlayer.textContent = state.session.playerName;
-
-  pinInput.value = '';
-  pinError.classList.add('hidden');
-  pinError.textContent = '';
-
-  if (state.session.hasPin) {
-    notSetNotice.classList.add('hidden');
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = state.activeTradeType === 'BUY' ? 'Konfirmasi & Beli' : 'Konfirmasi & Jual';
-    confirmBtn.className = state.activeTradeType === 'BUY'
-      ? 'flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20'
-      : 'flex-1 py-3 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-red-500/20';
-  } else {
-    notSetNotice.classList.remove('hidden');
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = 'Masukkan PIN 6-Digit';
-  }
-
-  pinModal.classList.remove('hidden');
-  pinModal.classList.add('flex');
-  setTimeout(() => pinInput.focus(), 150);
-}
-
-function closePinModal() {
-  const pinModal = document.getElementById('pin-modal');
-  if (pinModal) {
-    pinModal.classList.add('hidden');
-    pinModal.classList.remove('flex');
-  }
-  state.pendingTrade = null;
-}
-
-async function handlePinSubmit(e) {
-  e.preventDefault();
-  const pinInput = document.getElementById('pin-input');
-  const pin = pinInput.value.trim();
-  const pinError = document.getElementById('pin-error-msg');
-  const pinCard = document.getElementById('pin-modal-card');
-  const confirmBtn = document.getElementById('pin-confirm-btn');
-
-  if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
-    pinError.textContent = 'PIN harus terdiri dari tepat 6 angka numerik (0-9).';
-    pinError.classList.remove('hidden');
-    pinCard.classList.add('animate-shake');
-    setTimeout(() => pinCard.classList.remove('animate-shake'), 400);
-    return;
-  }
-
-  if (!state.pendingTrade) {
-    closePinModal();
-    return;
-  }
-
-  confirmBtn.disabled = true;
-  confirmBtn.textContent = 'Memverifikasi...';
-
-  try {
-    const res = await fetch('/api/trading/trade', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
-      },
-      body: JSON.stringify({
-        player_name: state.session.playerName,
-        pin: pin,
-        trade_type: state.pendingTrade.tradeType,
-        asset: state.pendingTrade.assetSymbol,
-        amount: state.pendingTrade.amount,
-        price: state.pendingTrade.price
-      })
-    });
-
-    const json = await res.json();
-
-    if (json.success && json.data) {
-      // Trade Success
-      state.session.cashBalance = json.data.new_balance;
-      state.session.hasPin = true;
-
-      // Update portfolios
-      if (json.data.portfolio) {
-        Object.keys(json.data.portfolio).forEach(k => {
-          if (state.portfolio[k]) {
-            state.portfolio[k].amount = json.data.portfolio[k][0] || 0;
-            state.portfolio[k].avgBuyPrice = json.data.portfolio[k][1] || 0;
-          }
-        });
-      }
-
-      // Add trade log
-      if (json.data.trade) {
-        const t = json.data.trade;
-        const now = new Date();
-        state.tradeLogs.unshift({
-          time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
-          type: t.trade_type,
-          asset: t.asset,
-          amount: t.amount,
-          price: t.price,
-          total: t.total
-        });
-      }
-
-      closePinModal();
-      startAntiWhaleCooldown();
-      updateUserProfileUI();
-      renderPortfolioTable();
-      renderTradeHistory();
-
-      // Clear input
-      document.getElementById('trade-amount-input').value = '';
-      calculateTradeCost();
-
-      showToast(json.message || 'Transaksi berhasil dieksekusi!', 'success');
-
-    } else {
-      // Error
-      pinCard.classList.add('animate-shake');
-      setTimeout(() => pinCard.classList.remove('animate-shake'), 400);
-
-      pinError.textContent = json.message || 'PIN salah atau transaksi gagal.';
-      pinError.classList.remove('hidden');
-
-      if (json.error_code === 'PIN_NOT_SET') {
-        document.getElementById('pin-not-set-notice').classList.remove('hidden');
-      }
-    }
-  } catch (err) {
-    console.error('Trade error:', err);
-    pinError.textContent = 'Terjadi kesalahan komunikasi dengan server.';
-    pinError.classList.remove('hidden');
-  } finally {
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = 'Konfirmasi Transaksi';
-  }
-}
-
-function startAntiWhaleCooldown() {
-  state.cooldownActive = true;
-  state.cooldownRemaining = 5;
-
-  const indicator = document.getElementById('cooldown-indicator');
-  const timerText = document.getElementById('cooldown-seconds');
-  const submitBtn = document.getElementById('trade-submit-btn');
-
-  if (indicator) indicator.classList.remove('hidden');
-  if (submitBtn) submitBtn.disabled = true;
-
-  if (cooldownTimer) clearInterval(cooldownTimer);
-  cooldownTimer = setInterval(() => {
-    state.cooldownRemaining--;
-    if (timerText) timerText.textContent = `${state.cooldownRemaining}s`;
-
-    if (state.cooldownRemaining <= 0) {
-      clearInterval(cooldownTimer);
-      state.cooldownActive = false;
-      if (indicator) indicator.classList.add('hidden');
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  }, 1000);
-}
-
-// =======================================================
-//   ASSET SELECTOR & WATCHLIST
+//   WATCHLIST & ASSET SELECTION
 // =======================================================
 function renderAssetList() {
   const container = document.getElementById('asset-list-container');
   if (!container) return;
 
-  container.innerHTML = Object.keys(state.assets).map(key => {
-    const asset = state.assets[key];
+  container.innerHTML = Object.entries(state.assets).map(([key, a]) => {
     const isSelected = state.activeAsset === key;
-    const isPositive = asset.changePercent >= 0;
+    const isUp = a.changePercent >= 0;
+    const changeClass = isUp ? 'text-emerald-400' : 'text-red-400';
+    const bgClass = isSelected ? 'bg-purple-950/40 border-primary/50 shadow-lg' : 'bg-neutral-950/60 border-neutral-800/80 hover:border-neutral-700';
 
     return `
-      <div 
-        onclick="selectAsset('${key}')"
-        class="glass-panel-hover rounded-xl p-3 cursor-pointer border ${isSelected ? 'border-primary bg-neutral-900/90 shadow-lg shadow-purple-500/10' : 'border-neutral-900 bg-neutral-950/60'} flex items-center justify-between transition-all"
-      >
-        <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center font-bold text-xs text-primary shrink-0">
-            ${asset.symbol}
+      <div onclick="selectAsset('${key}')" class="p-3 rounded-xl border ${bgClass} transition flex items-center justify-between cursor-pointer group">
+        <div class="flex items-center gap-2.5">
+          <div class="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center font-bold text-xs text-primary group-hover:scale-105 transition">
+            ${a.symbol}
           </div>
           <div>
-            <div class="font-bold text-xs text-white">${asset.name}</div>
-            <div class="text-[10px] text-neutral-500 font-mono">${asset.category}</div>
+            <div class="font-bold text-xs text-white">${a.name}</div>
+            <div class="text-[10px] text-neutral-400 font-mono">${a.category} • Pajak ${a.tax_percent}%</div>
           </div>
         </div>
-        <div class="text-right font-mono">
-          <div class="text-xs font-black text-white">$${asset.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          <div class="text-[10px] font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}">
-            ${isPositive ? '+' : ''}${asset.changePercent.toFixed(2)}%
-          </div>
+        <div class="text-right">
+          <div class="font-mono text-xs font-bold text-white">$${a.price.toFixed(2)}</div>
+          <div class="text-[10px] font-mono font-semibold ${changeClass}">${isUp ? '+' : ''}${a.changePercent.toFixed(2)}%</div>
         </div>
       </div>
     `;
@@ -624,331 +455,722 @@ function selectAsset(key) {
   state.activeAsset = key;
   renderAssetList();
   updateActiveAssetDisplay();
-  updateChartData();
-  renderOrderbook();
   calculateTradeCost();
+  updateChartData();
 }
 
 function updateActiveAssetDisplay() {
-  const asset = state.assets[state.activeAsset];
-  if (!asset) return;
+  const a = state.assets[state.activeAsset];
+  if (!a) return;
 
-  const isPositive = asset.changePercent >= 0;
+  const icon = document.getElementById('active-asset-icon');
+  const title = document.getElementById('active-asset-title');
+  const category = document.getElementById('active-asset-category');
+  const price = document.getElementById('active-asset-price');
+  const change = document.getElementById('active-asset-change');
+  const symbolHint = document.getElementById('trade-unit-symbol');
+  const summaryUnitPrice = document.getElementById('summary-unit-price');
+  const summaryTaxLabel = document.getElementById('summary-tax-label');
 
-  document.getElementById('active-asset-icon').textContent = asset.symbol;
-  document.getElementById('active-asset-title').textContent = `${asset.name} (${asset.symbol})`;
-  document.getElementById('active-asset-category').textContent = asset.category;
-  document.getElementById('active-asset-price').textContent = `$${asset.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  
-  const changeEl = document.getElementById('active-asset-change');
-  changeEl.className = `text-xs font-mono font-bold flex items-center justify-end gap-1 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`;
-  changeEl.innerHTML = `
-    <i data-lucide="${isPositive ? 'arrow-up-right' : 'arrow-down-right'}" class="h-3.5 w-3.5"></i>
-    ${isPositive ? '+' : ''}${asset.changePercent.toFixed(2)}% (24h)
-  `;
+  if (icon) icon.textContent = a.symbol;
+  if (title) title.textContent = `${a.name} (${a.symbol})`;
+  if (category) category.textContent = a.category;
+  if (price) price.textContent = `$${a.price.toFixed(2)}`;
 
-  document.getElementById('stat-high').textContent = `$${asset.high.toLocaleString()}`;
-  document.getElementById('stat-low').textContent = `$${asset.low.toLocaleString()}`;
-  document.getElementById('stat-vol').textContent = `$${(asset.volume / 1000).toFixed(1)}K`;
-  document.getElementById('trade-unit-symbol').textContent = asset.symbol;
-  document.getElementById('summary-unit-price').textContent = `$${asset.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-
-  if (window.lucide) {
-    lucide.createIcons();
+  const isUp = a.changePercent >= 0;
+  if (change) {
+    change.className = `text-xs font-mono font-bold flex items-center justify-end gap-1 ${isUp ? 'text-emerald-400' : 'text-red-400'}`;
+    change.innerHTML = `<i data-lucide="${isUp ? 'arrow-up-right' : 'arrow-down-right'}" class="h-3.5 w-3.5"></i> ${isUp ? '+' : ''}${a.changePercent.toFixed(2)}% (24h)`;
   }
+
+  if (symbolHint) symbolHint.textContent = a.symbol;
+  if (summaryUnitPrice) summaryUnitPrice.textContent = `$${a.price.toFixed(2)}`;
+  if (summaryTaxLabel) summaryTaxLabel.textContent = `Protocol Tax (${a.tax_percent}%):`;
+
+  const high = document.getElementById('stat-high');
+  const low = document.getElementById('stat-low');
+  const vol = document.getElementById('stat-vol');
+  if (high) high.textContent = `$${a.high.toFixed(2)}`;
+  if (low) low.textContent = `$${a.low.toFixed(2)}`;
+  if (vol) vol.textContent = `$${(a.volume / 1000).toFixed(1)}K`;
+
+  if (window.lucide) lucide.createIcons();
 }
 
 // =======================================================
-//   CHART.JS LIVE RENDERING
+//   ORDER EXECUTION (MARKET & LIMIT ORDER)
 // =======================================================
-function initTradingChart() {
-  const canvas = document.getElementById('tradingChart');
-  if (!canvas) return;
+function setOrderMode(mode) {
+  state.orderMode = mode;
+  const marketBtn = document.getElementById('order-mode-market');
+  const limitBtn = document.getElementById('order-mode-limit');
+  const limitPriceGroup = document.getElementById('limit-price-group');
+  const tradeBtnText = document.getElementById('trade-btn-text');
+  const priceLabel = document.getElementById('summary-price-label');
 
-  const ctx = canvas.getContext('2d');
-  const asset = state.assets[state.activeAsset];
-
-  // Create purple gradient
-  const gradient = ctx.createLinearGradient(0, 0, 0, 360);
-  gradient.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
-  gradient.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
-
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: generateChartLabels(asset.history.length),
-      datasets: [{
-        label: asset.name,
-        data: [...asset.history],
-        borderColor: '#a855f7',
-        borderWidth: 2.5,
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.35,
-        pointRadius: 3,
-        pointBackgroundColor: '#a855f7',
-        pointBorderColor: '#ffffff',
-        pointHoverRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        intersect: false,
-        mode: 'index',
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(15, 15, 15, 0.95)',
-          titleColor: '#a855f7',
-          bodyColor: '#ffffff',
-          borderColor: 'rgba(168, 85, 247, 0.3)',
-          borderWidth: 1,
-          padding: 10,
-          displayColors: false,
-          callbacks: {
-            label: (ctx) => `Harga: $${ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(255, 255, 255, 0.04)' },
-          ticks: { color: '#737373', font: { family: 'JetBrains Mono', size: 10 } }
-        },
-        y: {
-          position: 'right',
-          grid: { color: 'rgba(255, 255, 255, 0.04)' },
-          ticks: {
-            color: '#737373',
-            font: { family: 'JetBrains Mono', size: 10 },
-            callback: (val) => `$${val}`
-          }
-        }
-      }
-    }
-  });
-}
-
-function generateChartLabels(count) {
-  const labels = [];
-  const now = new Date();
-  const tf = state.timeframe || '5M';
-
-  let stepMinutes = 5;
-  if (tf === '1M') stepMinutes = 1;
-  else if (tf === '5M') stepMinutes = 5;
-  else if (tf === '15M') stepMinutes = 15;
-  else if (tf === '1H') stepMinutes = 60;
-  else if (tf === '1D') stepMinutes = 1440;
-
-  for (let i = count - 1; i >= 0; i--) {
-    const t = new Date(now.getTime() - i * stepMinutes * 60000);
-    if (tf === '1D') {
-      labels.push(`${t.getDate()}/${t.getMonth() + 1}`);
-    } else {
-      labels.push(`${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`);
-    }
-  }
-  return labels;
-}
-
-function updateChartData() {
-  if (!chartInstance) return;
-  const asset = state.assets[state.activeAsset];
-  const isPositive = asset.changePercent >= 0;
-
-  const ctx = chartInstance.ctx;
-  const gradient = ctx.createLinearGradient(0, 0, 0, 360);
-  if (isPositive) {
-    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+  if (mode === 'LIMIT') {
+    if (limitBtn) limitBtn.className = 'px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition cursor-pointer';
+    if (marketBtn) marketBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition cursor-pointer';
+    if (limitPriceGroup) limitPriceGroup.classList.remove('hidden');
+    if (priceLabel) priceLabel.textContent = 'Target Limit:';
+    if (tradeBtnText) tradeBtnText.textContent = 'Pasang Limit Order (' + state.activeTradeType + ')';
   } else {
-    gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+    if (marketBtn) marketBtn.className = 'px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition cursor-pointer';
+    if (limitBtn) limitBtn.className = 'px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition cursor-pointer';
+    if (limitPriceGroup) limitPriceGroup.classList.add('hidden');
+    if (priceLabel) priceLabel.textContent = 'Harga Spot:';
+    if (tradeBtnText) tradeBtnText.textContent = 'Eksekusi Order ' + (state.activeTradeType === 'BUY' ? 'Beli (BUY)' : 'Jual (SELL)');
   }
 
-  chartInstance.data.labels = generateChartLabels(asset.history.length);
-  chartInstance.data.datasets[0].label = asset.name;
-  chartInstance.data.datasets[0].data = [...asset.history];
-  chartInstance.data.datasets[0].borderColor = isPositive ? '#10b981' : '#ef4444';
-  chartInstance.data.datasets[0].pointBackgroundColor = isPositive ? '#10b981' : '#ef4444';
-  chartInstance.data.datasets[0].backgroundColor = gradient;
-  chartInstance.update('none');
+  calculateTradeCost();
 }
 
-function setTimeframe(tf) {
-  state.timeframe = tf;
-  document.querySelectorAll('.tf-btn').forEach(b => {
-    b.classList.remove('bg-primary', 'text-white', 'font-bold', 'active');
-    b.classList.add('text-neutral-400');
-  });
-
-  const activeBtn = Array.from(document.querySelectorAll('.tf-btn')).find(b => b.textContent.trim() === tf);
-  if (activeBtn) {
-    activeBtn.classList.add('bg-primary', 'text-white', 'font-bold', 'active');
-    activeBtn.classList.remove('text-neutral-400');
-  }
-
-  updateChartData();
-}
-
-// =======================================================
-//   ORDER CALCULATIONS & FORM SHORTCUTS
-// =======================================================
 function setTradeType(type) {
   state.activeTradeType = type;
   const buyBtn = document.getElementById('trade-tab-buy');
   const sellBtn = document.getElementById('trade-tab-sell');
   const submitBtn = document.getElementById('trade-submit-btn');
-  const btnText = document.getElementById('trade-btn-text');
-  const balLabel = document.getElementById('balance-label');
+  const balanceLabel = document.getElementById('balance-label');
+  const availableBal = document.getElementById('form-available-balance');
+  const tradeBtnText = document.getElementById('trade-btn-text');
 
   if (type === 'BUY') {
-    buyBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-emerald-600 text-white shadow-lg shadow-emerald-600/20';
-    sellBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white';
-    submitBtn.className = 'w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-xl shadow-emerald-500/20 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2';
-    btnText.textContent = `Eksekusi Order Beli (${state.assets[state.activeAsset].symbol})`;
-    balLabel.textContent = 'Saldo Kas Vault:';
+    if (buyBtn) buyBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 cursor-pointer';
+    if (sellBtn) sellBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white cursor-pointer';
+    if (submitBtn) submitBtn.className = 'w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-xl shadow-emerald-500/20 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2';
+    if (balanceLabel) balanceLabel.textContent = 'Saldo Kas Vault:';
+    if (availableBal) availableBal.textContent = formatCurrency(state.session.cashBalance);
+    if (tradeBtnText) tradeBtnText.textContent = state.orderMode === 'LIMIT' ? 'Pasang Limit Buy' : 'Eksekusi Order Beli (BUY)';
   } else {
-    sellBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-red-600 text-white shadow-lg shadow-red-600/20';
-    buyBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white';
-    submitBtn.className = 'w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-xl shadow-red-500/20 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2';
-    btnText.textContent = `Eksekusi Order Jual (${state.assets[state.activeAsset].symbol})`;
-    balLabel.textContent = 'Aset Dimiliki:';
-  }
-
-  updateBalanceDisplays();
-  calculateTradeCost();
-}
-
-function updateBalanceDisplays() {
-  const cashDisplay = document.getElementById('player-cash-display');
-  if (cashDisplay) {
-    cashDisplay.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  }
-  
-  const formBal = document.getElementById('form-available-balance');
-  if (formBal) {
-    if (state.activeTradeType === 'BUY') {
-      formBal.textContent = `$${state.session.cashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    } else {
-      const owned = state.portfolio[state.activeAsset]?.amount || 0;
-      formBal.textContent = `${owned.toFixed(2)} ${state.assets[state.activeAsset].symbol}`;
-    }
-  }
-}
-
-function setPercentageAmount(pct) {
-  const asset = state.assets[state.activeAsset];
-  const input = document.getElementById('trade-amount-input');
-
-  if (state.activeTradeType === 'BUY') {
-    const totalCash = state.session.cashBalance;
-    const taxRate = getAssetTaxRate(state.activeAsset);
-    const maxBuyAmount = totalCash / (asset.price * (1 + taxRate));
-    const amount = Math.floor(maxBuyAmount * pct * 100) / 100;
-    input.value = Math.min(amount, 1000) > 0 ? Math.min(amount, 1000) : '';
-  } else {
-    const owned = state.portfolio[state.activeAsset]?.amount || 0;
-    const amount = Math.floor(owned * pct * 100) / 100;
-    input.value = amount > 0 ? amount : '';
+    if (sellBtn) sellBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-red-600 text-white shadow-lg shadow-red-600/20 cursor-pointer';
+    if (buyBtn) buyBtn.className = 'py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white cursor-pointer';
+    if (submitBtn) submitBtn.className = 'w-full py-4 rounded-xl font-bold uppercase text-xs tracking-wider transition-all cursor-pointer bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-xl shadow-red-500/20 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2';
+    if (balanceLabel) balanceLabel.textContent = 'Aset ' + state.assets[state.activeAsset].symbol + ' Dimiliki:';
+    const owned = state.portfolio[state.activeAsset] ? state.portfolio[state.activeAsset].amount : 0;
+    if (availableBal) availableBal.textContent = owned.toFixed(2) + ' ' + state.assets[state.activeAsset].symbol;
+    if (tradeBtnText) tradeBtnText.textContent = state.orderMode === 'LIMIT' ? 'Pasang Limit Sell' : 'Eksekusi Order Jual (SELL)';
   }
 
   calculateTradeCost();
 }
 
 function calculateTradeCost() {
-  const input = document.getElementById('trade-amount-input');
-  const amount = parseFloat(input.value) || 0;
+  const amountInput = document.getElementById('trade-amount-input');
+  const targetPriceInput = document.getElementById('trade-target-price-input');
+  const summarySubtotal = document.getElementById('summary-subtotal');
+  const summaryTax = document.getElementById('summary-tax');
+  const summaryTotal = document.getElementById('summary-total');
+  const summaryUnitPrice = document.getElementById('summary-unit-price');
+
+  const asset = state.assets[state.activeAsset];
+  const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
+  
+  let unitPrice = asset.price;
+  if (state.orderMode === 'LIMIT' && targetPriceInput && parseFloat(targetPriceInput.value) > 0) {
+    unitPrice = parseFloat(targetPriceInput.value);
+  }
+
+  if (summaryUnitPrice) summaryUnitPrice.textContent = '$' + unitPrice.toFixed(2);
+
+  const subtotal = amount * unitPrice;
+  const tax = subtotal * (asset.tax_percent / 100.0);
+  const total = state.activeTradeType === 'BUY' ? (subtotal + tax) : (subtotal - tax);
+
+  if (summarySubtotal) summarySubtotal.textContent = formatCurrency(subtotal);
+  if (summaryTax) summaryTax.textContent = formatCurrency(tax);
+  if (summaryTotal) summaryTotal.textContent = formatCurrency(total);
+}
+
+function setPercentageAmount(pct) {
+  const amountInput = document.getElementById('trade-amount-input');
+  const asset = state.assets[state.activeAsset];
+  if (!amountInput) return;
+
+  if (state.activeTradeType === 'BUY') {
+    const cash = state.session.cashBalance;
+    const taxMultiplier = 1.0 + (asset.tax_percent / 100.0);
+    const targetPriceInput = document.getElementById('trade-target-price-input');
+    const unitPrice = (state.orderMode === 'LIMIT' && targetPriceInput && parseFloat(targetPriceInput.value) > 0)
+      ? parseFloat(targetPriceInput.value) : asset.price;
+
+    const maxUnits = (cash * pct) / (unitPrice * taxMultiplier);
+    amountInput.value = Math.min(1000, Math.max(0, Math.floor(maxUnits * 100) / 100)).toFixed(2);
+  } else {
+    const owned = state.portfolio[state.activeAsset] ? state.portfolio[state.activeAsset].amount : 0;
+    amountInput.value = (owned * pct).toFixed(2);
+  }
+
+  calculateTradeCost();
+}
+
+function promptPinModal(e) {
+  e.preventDefault();
+  if (!state.session.isLoggedIn) {
+    openLoginModal();
+    return;
+  }
+
+  const amountInput = document.getElementById('trade-amount-input');
+  const targetPriceInput = document.getElementById('trade-target-price-input');
+  const amount = parseFloat(amountInput ? amountInput.value : 0);
   const asset = state.assets[state.activeAsset];
 
-  const taxRate = getAssetTaxRate(state.activeAsset);
-  const taxPercent = Math.round(taxRate * 100);
-  const subtotal = amount * asset.price;
-  const tax = subtotal * taxRate;
-  const total = state.activeTradeType === 'BUY' ? subtotal + tax : subtotal - tax;
+  if (!amount || amount <= 0) {
+    showToast('error', 'Masukkan jumlah unit transaksi yang valid.');
+    return;
+  }
 
-  const taxLabel = document.getElementById('summary-tax-label');
-  if (taxLabel) taxLabel.textContent = `Protocol Tax (${taxPercent}%):`;
+  let targetPrice = asset.price;
+  if (state.orderMode === 'LIMIT') {
+    targetPrice = parseFloat(targetPriceInput ? targetPriceInput.value : 0);
+    if (!targetPrice || targetPrice <= 0) {
+      showToast('error', 'Masukkan target harga limit order yang valid.');
+      return;
+    }
+  }
 
-  document.getElementById('summary-subtotal').textContent = `$${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  document.getElementById('summary-tax').textContent = `$${tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-  document.getElementById('summary-total').textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  state.pendingTrade = {
+    orderMode: state.orderMode,
+    tradeType: state.activeTradeType,
+    asset: asset.symbol,
+    amount: amount,
+    price: targetPrice
+  };
+
+  const modal = document.getElementById('pin-modal');
+  const summaryAction = document.getElementById('pin-summary-action');
+  const summaryCost = document.getElementById('pin-summary-cost');
+  const pinInput = document.getElementById('trade-pin-input');
+  const errText = document.getElementById('pin-error-text');
+
+  if (summaryAction) summaryAction.textContent = (state.orderMode === 'LIMIT' ? 'LIMIT ' : '') + state.activeTradeType + ' ' + amount + ' ' + asset.symbol + ' @ $' + targetPrice.toFixed(2);
+  const subtotal = amount * targetPrice;
+  const tax = subtotal * (asset.tax_percent / 100.0);
+  const total = state.activeTradeType === 'BUY' ? (subtotal + tax) : (subtotal - tax);
+  if (summaryCost) summaryCost.textContent = formatCurrency(total);
+
+  if (errText) errText.classList.add('hidden');
+  if (pinInput) pinInput.value = '';
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (pinInput) pinInput.focus();
+  }
+}
+
+function closePinModal() {
+  const modal = document.getElementById('pin-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+}
+
+async function handlePinSubmit(e) {
+  e.preventDefault();
+  const pinInput = document.getElementById('trade-pin-input');
+  const pin = pinInput ? pinInput.value.trim() : '';
+
+  if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+    showPinError('PIN harus 6 digit angka.');
+    return;
+  }
+
+  const btn = document.getElementById('pin-confirm-btn');
+  if (btn) btn.disabled = true;
+
+  if (state.pendingTrade.orderMode === 'LIMIT') {
+    await executeLimitOrder(pin);
+  } else {
+    await executeMarketTrade(pin);
+  }
+
+  if (btn) btn.disabled = false;
+}
+
+function showPinError(msg) {
+  const errText = document.getElementById('pin-error-text');
+  const pinInput = document.getElementById('trade-pin-input');
+  if (errText) {
+    errText.textContent = msg;
+    errText.classList.remove('hidden');
+  }
+  if (pinInput) {
+    pinInput.classList.add('animate-shake', 'border-red-500');
+    setTimeout(() => pinInput.classList.remove('animate-shake', 'border-red-500'), 500);
+  }
+}
+
+async function executeMarketTrade(pin) {
+  try {
+    const res = await fetch('/api/trading/trade', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        pin: pin,
+        trade_type: state.pendingTrade.tradeType,
+        asset: state.pendingTrade.asset,
+        amount: state.pendingTrade.amount,
+        price: state.pendingTrade.price
+      })
+    });
+
+    const json = await res.json();
+    if (json.success) {
+      closePinModal();
+      state.session.cashBalance = json.data.new_cash_balance;
+      
+      // Update local portfolio
+      if (json.data.portfolio) {
+        for (const [k, v] of Object.entries(json.data.portfolio)) {
+          if (state.portfolio[k]) {
+            state.portfolio[k].amount = parseFloat(v[0]);
+            state.portfolio[k].avgBuyPrice = parseFloat(v[1]);
+          }
+        }
+      }
+
+      if (json.data.trade) {
+        state.tradeLogs.unshift(json.data.trade);
+        renderTradeHistory();
+      }
+
+      updateUserUI();
+      renderPortfolioTable();
+      calculateTradeCost();
+      showToast('success', json.message);
+      startCooldown(5);
+    } else {
+      showPinError(json.message || 'Transaksi gagal.');
+    }
+  } catch (err) {
+    showPinError('Gagal menghubungkan ke server.');
+  }
+}
+
+async function executeLimitOrder(pin) {
+  try {
+    const res = await fetch('/api/trading/limit-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        pin: pin,
+        order_type: state.pendingTrade.tradeType,
+        asset: state.pendingTrade.asset,
+        amount: state.pendingTrade.amount,
+        target_price: state.pendingTrade.price
+      })
+    });
+
+    const json = await res.json();
+    if (json.success) {
+      closePinModal();
+      if (json.data.new_cash_balance !== undefined) {
+        state.session.cashBalance = json.data.new_cash_balance;
+      }
+      if (json.data.portfolio) {
+        for (const [k, v] of Object.entries(json.data.portfolio)) {
+          if (state.portfolio[k]) {
+            state.portfolio[k].amount = parseFloat(v[0]);
+            state.portfolio[k].avgBuyPrice = parseFloat(v[1]);
+          }
+        }
+      }
+
+      updateUserUI();
+      renderPortfolioTable();
+      loadLimitOrders();
+      showToast('success', json.message);
+      switchBottomTab('limit-orders');
+    } else {
+      showPinError(json.message || 'Gagal memasang limit order.');
+    }
+  } catch (err) {
+    showPinError('Koneksi timeout.');
+  }
+}
+
+function startCooldown(sec) {
+  state.cooldownActive = true;
+  state.cooldownRemaining = sec;
+  const indicator = document.getElementById('cooldown-indicator');
+  const countSpan = document.getElementById('cooldown-seconds');
+  const submitBtn = document.getElementById('trade-submit-btn');
+
+  if (indicator) indicator.classList.remove('hidden');
+  if (submitBtn) submitBtn.disabled = true;
+
+  if (cooldownTimer) clearInterval(cooldownTimer);
+  cooldownTimer = setInterval(() => {
+    state.cooldownRemaining--;
+    if (countSpan) countSpan.textContent = state.cooldownRemaining + 's';
+    if (state.cooldownRemaining <= 0) {
+      clearInterval(cooldownTimer);
+      state.cooldownActive = false;
+      if (indicator) indicator.classList.add('hidden');
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }, 1000);
 }
 
 // =======================================================
-//   ORDERBOOK & PORTFOLIO TABLES
+//   LIMIT ORDERS TAB & MANAGEMENT
 // =======================================================
-function renderOrderbook() {
-  const asset = state.assets[state.activeAsset];
-  const bidsContainer = document.getElementById('orderbook-bids');
-  const asksContainer = document.getElementById('orderbook-asks');
-
-  if (!bidsContainer || !asksContainer) return;
-
-  const p = asset.price;
-  const bids = [
-    { price: p * 0.998, amount: 4.2 },
-    { price: p * 0.995, amount: 8.5 },
-    { price: p * 0.991, amount: 12.0 },
-    { price: p * 0.985, amount: 25.4 }
-  ];
-
-  const asks = [
-    { price: p * 1.002, amount: 3.8 },
-    { price: p * 1.006, amount: 7.1 },
-    { price: p * 1.011, amount: 14.5 },
-    { price: p * 1.018, amount: 22.0 }
-  ];
-
-  bidsContainer.innerHTML = bids.map(b => `
-    <div class="flex justify-between py-1 px-2 rounded bg-emerald-500/5 hover:bg-emerald-500/10">
-      <span class="text-emerald-400 font-bold">$${b.price.toFixed(2)}</span>
-      <span class="text-neutral-400">${b.amount.toFixed(2)}</span>
-    </div>
-  `).join('');
-
-  asksContainer.innerHTML = asks.map(a => `
-    <div class="flex justify-between py-1 px-2 rounded bg-red-500/5 hover:bg-red-500/10">
-      <span class="text-red-400 font-bold">$${a.price.toFixed(2)}</span>
-      <span class="text-neutral-400">${a.amount.toFixed(2)}</span>
-    </div>
-  `).join('');
+async function loadLimitOrders() {
+  if (!state.session.isLoggedIn) return;
+  try {
+    const res = await fetch('/api/trading/limit-orders?player_name=' + encodeURIComponent(state.session.playerName));
+    const json = await res.json();
+    if (json.success && json.data) {
+      state.limitOrders = json.data;
+      renderLimitOrdersTable();
+    }
+  } catch (e) {}
 }
 
+function renderLimitOrdersTable() {
+  const tbody = document.getElementById('limit-orders-table-body');
+  if (!tbody) return;
+
+  if (state.limitOrders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-neutral-500 font-sans">Belum ada limit order. Pasang di panel kanan dengan memilih tipe Limit Order.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = state.limitOrders.map(o => {
+    const isBuy = o.order_type === 'BUY';
+    const typeBadge = isBuy
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">LIMIT BUY</span>'
+      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">LIMIT SELL</span>';
+
+    const statusBadge = o.status === 'PENDING'
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-primary border border-purple-500/20 animate-pulse">PENDING</span>'
+      : o.status === 'FILLED'
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">FILLED</span>'
+      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-800 text-neutral-400">CANCELLED</span>';
+
+    const cancelBtn = o.status === 'PENDING'
+      ? '<button onclick="cancelLimitOrder(' + o.id + ')" class="px-2.5 py-1 rounded bg-red-900/40 hover:bg-red-800 border border-red-700/50 text-red-300 text-[10px] font-bold uppercase transition">Batal</button>'
+      : '-';
+
+    return `
+      <tr class="border-b border-neutral-900/60 hover:bg-neutral-900/30">
+        <td class="py-2.5 px-3 text-neutral-500 text-[11px]">${o.created_at ? o.created_at.substring(11, 16) : '-'}</td>
+        <td class="py-2.5 px-3">${typeBadge}</td>
+        <td class="py-2.5 px-3 font-bold text-white">${parseFloat(o.amount).toFixed(2)} ${o.asset}</td>
+        <td class="py-2.5 px-3 font-bold text-purple-400">$${parseFloat(o.target_price).toFixed(2)}</td>
+        <td class="py-2.5 px-3">${statusBadge}</td>
+        <td class="py-2.5 px-3 text-right">${cancelBtn}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function cancelLimitOrder(orderId) {
+  try {
+    const res = await fetch('/api/trading/cancel-limit-order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        order_id: orderId
+      })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('success', json.message);
+      loginPlayer(state.session.playerName);
+      loadLimitOrders();
+    } else {
+      showToast('error', json.message);
+    }
+  } catch (e) {
+    showToast('error', 'Gagal membatalkan order.');
+  }
+}
+
+// =======================================================
+//   PRICE ALERTS TAB
+// =======================================================
+async function loadPriceAlerts() {
+  if (!state.session.isLoggedIn) return;
+  try {
+    const res = await fetch('/api/trading/alerts?player_name=' + encodeURIComponent(state.session.playerName));
+    const json = await res.json();
+    if (json.success && json.data) {
+      state.priceAlerts = json.data;
+      renderPriceAlertsList();
+    }
+  } catch (e) {}
+}
+
+function renderPriceAlertsList() {
+  const container = document.getElementById('price-alerts-list');
+  if (!container) return;
+
+  if (state.priceAlerts.length === 0) {
+    container.innerHTML = '<div class="text-center py-6 text-neutral-500 font-sans">Belum ada price alert yang terpasang.</div>';
+    return;
+  }
+
+  container.innerHTML = state.priceAlerts.map(a => {
+    const condText = a.condition === 'ABOVE' ? '≥ (Naik Menembus)' : '≤ (Turun Menyentuh)';
+    const statusText = a.is_triggered
+      ? '<span class="text-emerald-400 font-bold">⚡ TRIGGERED</span>'
+      : '<span class="text-amber-400 font-bold">ACTIVE</span>';
+
+    return `
+      <div class="p-3 rounded-xl bg-neutral-950/80 border border-neutral-900 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-bold text-amber-400 text-xs">
+            ${a.asset}
+          </div>
+          <div>
+            <div class="font-bold text-white text-xs">${a.asset} ${condText} $${parseFloat(a.target_price).toFixed(2)}</div>
+            <div class="text-[10px] text-neutral-500">${statusText} • Pasang di $${parseFloat(a.initial_price).toFixed(2)}</div>
+          </div>
+        </div>
+        <button onclick="cancelPriceAlert(${a.id})" class="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-red-400 text-xs font-bold transition">
+          <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+        </button>
+      </div>
+    `;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handlePriceAlertSubmit(e) {
+  e.preventDefault();
+  if (!state.session.isLoggedIn) {
+    openLoginModal();
+    return;
+  }
+
+  const assetSelect = document.getElementById('alert-asset-select');
+  const targetPriceInput = document.getElementById('alert-target-price-input');
+  const asset = assetSelect ? assetSelect.value : 'BTC';
+  const targetPrice = parseFloat(targetPriceInput ? targetPriceInput.value : 0);
+
+  if (!targetPrice || targetPrice <= 0) {
+    showToast('error', 'Target harga tidak valid.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/trading/alert', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        asset: asset,
+        target_price: targetPrice
+      })
+    });
+
+    const json = await res.json();
+    if (json.success) {
+      showToast('success', json.message);
+      if (targetPriceInput) targetPriceInput.value = '';
+      loadPriceAlerts();
+    } else {
+      showToast('error', json.message);
+    }
+  } catch (err) {
+    showToast('error', 'Gagal memasang price alert.');
+  }
+}
+
+async function cancelPriceAlert(alertId) {
+  try {
+    const res = await fetch('/api/trading/cancel-alert', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        player_name: state.session.playerName,
+        alert_id: alertId
+      })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast('success', json.message);
+      loadPriceAlerts();
+    }
+  } catch (e) {}
+}
+
+// =======================================================
+//   P2P ASSET TRANSFER TAB
+// =======================================================
+function updateTransferBalanceHint() {
+  const assetSelect = document.getElementById('transfer-asset-select');
+  const hint = document.getElementById('transfer-owned-hint');
+  const assetKey = assetSelect ? assetSelect.value.toLowerCase() : 'btc';
+  const owned = state.portfolio[assetKey] ? state.portfolio[assetKey].amount : 0;
+  if (hint) hint.textContent = 'Saldo: ' + owned.toFixed(2) + ' ' + assetKey.toUpperCase();
+  calculateTransferFee();
+}
+
+function calculateTransferFee() {
+  const amountInput = document.getElementById('transfer-amount-input');
+  const feeDisplay = document.getElementById('transfer-fee-display');
+  const netDisplay = document.getElementById('transfer-net-display');
+  const assetSelect = document.getElementById('transfer-asset-select');
+  const sym = assetSelect ? assetSelect.value : 'BTC';
+
+  const amount = parseFloat(amountInput ? amountInput.value : 0) || 0;
+  const fee = amount * 0.02;
+  const net = Math.max(0, amount - fee);
+
+  if (feeDisplay) feeDisplay.textContent = fee.toFixed(4) + ' ' + sym;
+  if (netDisplay) netDisplay.textContent = net.toFixed(4) + ' ' + sym;
+}
+
+async function handleTransferSubmit(e) {
+  e.preventDefault();
+  if (!state.session.isLoggedIn) {
+    openLoginModal();
+    return;
+  }
+
+  const receiverInput = document.getElementById('transfer-receiver-input');
+  const assetSelect = document.getElementById('transfer-asset-select');
+  const amountInput = document.getElementById('transfer-amount-input');
+  const pinInput = document.getElementById('transfer-pin-input');
+
+  const receiver = receiverInput ? receiverInput.value.trim() : '';
+  const asset = assetSelect ? assetSelect.value : 'BTC';
+  const amount = parseFloat(amountInput ? amountInput.value : 0);
+  const pin = pinInput ? pinInput.value.trim() : '';
+
+  if (!receiver) {
+    showToast('error', 'Masukkan username penerima.');
+    return;
+  }
+  if (!amount || amount <= 0) {
+    showToast('error', 'Masukkan jumlah unit transfer valid.');
+    return;
+  }
+  if (!pin || pin.length !== 6) {
+    showToast('error', 'PIN harus 6 digit.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/trading/transfer', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CONFIG.csrfToken || ''
+      },
+      body: JSON.stringify({
+        sender_name: state.session.playerName,
+        receiver_name: receiver,
+        pin: pin,
+        asset: asset,
+        amount: amount
+      })
+    });
+
+    const json = await res.json();
+    if (json.success) {
+      showToast('success', json.message);
+      if (amountInput) amountInput.value = '';
+      if (pinInput) pinInput.value = '';
+      loginPlayer(state.session.playerName);
+      switchBottomTab('portfolio');
+    } else {
+      showToast('error', json.message || 'Transfer gagal.');
+    }
+  } catch (err) {
+    showToast('error', 'Gagal memproses transfer.');
+  }
+}
+
+// =======================================================
+//   PORTFOLIO & ORDERBOOK & LOGS TABLE
+// =======================================================
 function renderPortfolioTable() {
   const tbody = document.getElementById('portfolio-table-body');
   if (!tbody) return;
 
-  const rows = Object.keys(state.portfolio).map(key => {
-    const item = state.portfolio[key];
-    const asset = state.assets[key];
-    const currentVal = item.amount * asset.price;
-    const investedVal = item.amount * item.avgBuyPrice;
-    const pnl = item.amount > 0 ? currentVal - investedVal : 0;
-    const pnlPercent = investedVal > 0 ? (pnl / investedVal) * 100 : 0;
-    const isProfit = pnl >= 0;
+  tbody.innerHTML = Object.entries(state.assets).map(([key, a]) => {
+    const holding = state.portfolio[key] || { amount: 0, avgBuyPrice: 0 };
+    const amount = holding.amount;
+    const avgPrice = holding.avgBuyPrice;
+    const currentVal = amount * a.price;
+    const costBasis = amount * avgPrice;
+    const pnlVal = currentVal - costBasis;
+    const pnlPct = costBasis > 0 ? (pnlVal / costBasis) * 100 : 0;
+    const isProfit = pnlVal >= 0;
+    const pnlClass = isProfit ? 'text-emerald-400' : 'text-red-400';
 
     return `
-      <tr class="hover:bg-neutral-900/40 transition">
-        <td class="py-2.5 px-3 font-bold text-white flex items-center gap-2">
-          <span class="h-2 w-2 rounded-full bg-primary"></span>
-          ${asset.name} (${asset.symbol})
+      <tr class="border-b border-neutral-900/60 hover:bg-neutral-900/30">
+        <td class="py-3 px-3 font-bold text-white flex items-center gap-2">
+          <span class="h-6 w-6 rounded bg-purple-500/10 text-primary flex items-center justify-center text-[10px] font-mono font-bold">${a.symbol}</span>
+          <span>${a.name}</span>
         </td>
-        <td class="py-2.5 px-3 font-mono">${item.amount.toFixed(2)}</td>
-        <td class="py-2.5 px-3 font-mono">$${item.avgBuyPrice.toFixed(2)}</td>
-        <td class="py-2.5 px-3 font-mono font-bold text-white">$${currentVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-        <td class="py-2.5 px-3 font-mono font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}">
-          ${isProfit ? '+' : ''}$${pnl.toFixed(2)} (${isProfit ? '+' : ''}${pnlPercent.toFixed(2)}%)
+        <td class="py-3 px-3 font-bold text-white">${amount.toFixed(2)} ${a.symbol}</td>
+        <td class="py-3 px-3 text-neutral-400">$${avgPrice.toFixed(2)}</td>
+        <td class="py-3 px-3 font-bold text-white">${formatCurrency(currentVal)}</td>
+        <td class="py-3 px-3 font-bold ${pnlClass}">
+          ${amount > 0 ? (isProfit ? '+' : '') + formatCurrency(pnlVal) + ' (' + (isProfit ? '+' : '') + pnlPct.toFixed(2) + '%)' : '-'}
         </td>
       </tr>
     `;
-  });
+  }).join('');
+}
 
-  tbody.innerHTML = rows.join('');
+function renderOrderbook() {
+  const bidsContainer = document.getElementById('orderbook-bids');
+  const asksContainer = document.getElementById('orderbook-asks');
+  const asset = state.assets[state.activeAsset];
+  if (!bidsContainer || !asksContainer || !asset) return;
+
+  const currentPrice = asset.price;
+  let bidsHtml = '';
+  let asksHtml = '';
+
+  for (let i = 1; i <= 5; i++) {
+    const bPrice = (currentPrice * (1 - (i * 0.003))).toFixed(2);
+    const bAmt = (Math.random() * 5 + 1).toFixed(2);
+    bidsHtml += `
+      <div class="flex justify-between py-1 px-2 rounded bg-emerald-950/20 border border-emerald-900/20 text-emerald-400">
+        <span>$${bPrice}</span>
+        <span class="text-neutral-400">${bAmt}</span>
+      </div>
+    `;
+
+    const aPrice = (currentPrice * (1 + (i * 0.003))).toFixed(2);
+    const aAmt = (Math.random() * 5 + 1).toFixed(2);
+    asksHtml += `
+      <div class="flex justify-between py-1 px-2 rounded bg-red-950/20 border border-red-900/20 text-red-400">
+        <span>$${aPrice}</span>
+        <span class="text-neutral-400">${aAmt}</span>
+      </div>
+    `;
+  }
+
+  bidsContainer.innerHTML = bidsHtml;
+  asksContainer.innerHTML = asksHtml;
 }
 
 function renderTradeHistory() {
@@ -956,276 +1178,154 @@ function renderTradeHistory() {
   if (!container) return;
 
   if (state.tradeLogs.length === 0) {
-    container.innerHTML = `<div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada akun ini.</div>`;
+    container.innerHTML = '<div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada sesi ini.</div>';
     return;
   }
 
-  container.innerHTML = state.tradeLogs.map(log => `
-    <div class="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900/60 border border-neutral-900 text-xs font-mono">
-      <div class="flex items-center gap-3">
-        <span class="text-neutral-500 text-[10px]">${log.time}</span>
-        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${log.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">
-          ${log.type}
-        </span>
-        <span class="font-bold text-white">${log.amount} ${log.asset}</span>
+  container.innerHTML = state.tradeLogs.map(t => {
+    const isBuy = t.trade_type.includes('BUY') || t.trade_type.includes('TRANSFER_IN');
+    const color = isBuy ? 'text-emerald-400' : 'text-red-400';
+    return `
+      <div class="p-2 rounded-xl bg-neutral-950/80 border border-neutral-900 flex items-center justify-between text-xs font-mono">
+        <div class="flex items-center gap-2">
+          <span class="font-bold ${color}">${t.trade_type}</span>
+          <span class="text-white">${parseFloat(t.amount).toFixed(2)} ${t.asset}</span>
+        </div>
+        <div class="text-right">
+          <span class="text-white font-bold">$${parseFloat(t.total).toFixed(2)}</span>
+        </div>
       </div>
-      <div class="text-right">
-        <span class="text-white font-bold">$${log.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-function switchBottomTab(tab) {
-  document.querySelectorAll('.bottom-tab-btn').forEach(b => {
-    b.classList.remove('bg-primary', 'text-white', 'shadow-lg');
-    b.classList.add('bg-neutral-900/60', 'text-neutral-400');
-  });
-
-  const activeBtn = document.getElementById(`tab-btn-${tab}`);
-  if (activeBtn) {
-    activeBtn.classList.add('bg-primary', 'text-white', 'shadow-lg');
-    activeBtn.classList.remove('bg-neutral-900/60', 'text-neutral-400');
-  }
-
-  document.getElementById('tab-content-portfolio')?.classList.add('hidden');
-  document.getElementById('tab-content-orderbook')?.classList.add('hidden');
-  document.getElementById('tab-content-history')?.classList.add('hidden');
-  document.getElementById('tab-content-leaderboard')?.classList.add('hidden');
-
-  const content = document.getElementById(`tab-content-${tab}`);
-  if (content) content.classList.remove('hidden');
-
-  if (tab === 'leaderboard') {
-    loadLeaderboard();
-  }
-
-  if (window.lucide) {
-    lucide.createIcons();
-  }
+    `;
+  }).join('');
 }
 
 // =======================================================
-//   TOP 10 INVESTORS LEADERBOARD ENGINE
+//   LEADERBOARD TOP 10
 // =======================================================
 async function loadLeaderboard() {
   try {
     const res = await fetch('/api/trading/leaderboard');
     const json = await res.json();
+    if (json.success && json.data) {
+      const d = json.data;
+      const cap = document.getElementById('lb-market-cap');
+      const inv = document.getElementById('lb-total-investors');
+      if (cap) cap.textContent = formatCurrency(d.total_market_cap);
+      if (inv) inv.textContent = d.total_investors + ' Pemain';
 
-    if (!json.success || !json.data) return;
-
-    const { total_investors, total_market_cap, top_investors } = json.data;
-
-    const mCapEl = document.getElementById('lb-market-cap');
-    const tInvEl = document.getElementById('lb-total-investors');
-    if (mCapEl) mCapEl.textContent = `$${total_market_cap.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    if (tInvEl) tInvEl.textContent = `${total_investors} Pemain`;
-
-    // Render Podium (Top 3)
-    const podiumEl = document.getElementById('leaderboard-podium');
-    if (podiumEl) {
-      if (top_investors.length === 0) {
-        podiumEl.innerHTML = `
-          <div class="col-span-1 sm:col-span-3 text-center py-10 px-4 rounded-2xl bg-neutral-950/60 border border-neutral-900 space-y-2">
-            <div class="mx-auto h-12 w-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <i data-lucide="trophy" class="h-6 w-6"></i>
-            </div>
-            <h4 class="font-bold text-white text-sm">Belum Ada Investor Terdaftar</h4>
-            <p class="text-xs text-neutral-400 max-w-md mx-auto leading-relaxed">
-              Jadilah yang pertama masuk ke Top 10 Hall of Fame! Masuk ke server Minecraft in-game (<code class="text-primary">genzsmp.site</code>) dan ketik: <strong class="text-white">/invest setpin &lt;6-digit&gt;</strong> untuk memulai portofolio Anda.
-            </p>
-          </div>
-        `;
-      } else {
-        const top3 = top_investors.slice(0, 3);
-        const podiumCards = top3.map((inv, idx) => {
-          const rankColors = [
-            { border: 'border-amber-500/50', bg: 'bg-amber-500/10', text: 'text-amber-400', badge: '#1 GOLD', label: '1ST PLACE' },
-            { border: 'border-slate-400/40', bg: 'bg-slate-400/10', text: 'text-slate-300', badge: '#2 SILVER', label: '2ND PLACE' },
-            { border: 'border-amber-700/40', bg: 'bg-amber-700/10', text: 'text-amber-600', badge: '#3 BRONZE', label: '3RD PLACE' }
-          ][idx] || { border: 'border-neutral-800', bg: 'bg-neutral-900', text: 'text-white', badge: '#', label: '' };
-
-          return `
-            <div class="p-4 rounded-2xl ${podiumCardsBg(idx)} border ${rankColors.border} relative overflow-hidden flex flex-col items-center text-center space-y-2.5 shadow-xl">
-              <div class="flex items-center justify-between w-full text-[10px] font-mono font-bold">
-                <span class="${rankColors.text} flex items-center gap-1">${rankColors.badge} • ${rankColors.label}</span>
-                <span class="px-2 py-0.5 rounded-full bg-neutral-900/80 border border-neutral-800 text-neutral-300">${inv.badge}</span>
-              </div>
-
-              <div class="relative">
-                <img src="${inv.avatar_url}" alt="${inv.player_name}" class="h-14 w-14 rounded-xl border-2 ${rankColors.border} shadow-lg" onerror="this.src='/images/logo.png'" />
-                ${inv.is_bedrock ? '<span class="absolute -bottom-1 -right-1 px-1.5 py-0.2 rounded text-[8px] font-bold bg-cyan-500 text-black">BE</span>' : ''}
-              </div>
-
-              <div>
-                <h4 class="font-bold text-white text-sm truncate max-w-[140px]">${inv.player_name}</h4>
-                <p class="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Total Aset Investasi</p>
-                <p class="font-mono font-black text-sm text-purple-300">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-              </div>
-
-              <div class="w-full pt-2 border-t border-neutral-800/80 grid grid-cols-2 text-[10px] font-mono text-neutral-400">
-                <div>Kas: <strong class="text-white">$${(inv.cash_balance / 1000).toFixed(1)}k</strong></div>
-                <div>Trades: <strong class="text-white">${inv.total_trades}x</strong></div>
-              </div>
-            </div>
-          `;
-        });
-        podiumEl.innerHTML = podiumCards.join('');
-      }
+      renderLeaderboard(d.top_investors || []);
     }
+  } catch (e) {}
+}
 
-    // Render Table (Rank 4 - 10)
-    const tableBody = document.getElementById('leaderboard-table-body');
-    if (tableBody) {
-      if (top_investors.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-neutral-500 font-sans">Belum ada riwayat transaksi investor pada sesi ini.</td></tr>`;
-      } else {
-        const rest = top_investors.slice(3);
-        if (rest.length === 0) {
-          tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-neutral-500 font-sans">Semua investor terdaftar telah tampil di podium atas.</td></tr>`;
-        } else {
-          tableBody.innerHTML = rest.map(inv => `
-            <tr class="hover:bg-white/[0.02] transition">
-              <td class="py-2.5 px-3 font-bold text-neutral-400">#${inv.rank}</td>
-              <td class="py-2.5 px-3">
-                <div class="flex items-center gap-2">
-                  <img src="${inv.avatar_url}" class="h-6 w-6 rounded-md border border-neutral-800" onerror="this.src='/images/logo.png'" />
-                  <span class="font-bold text-white">${inv.player_name}</span>
-                  ${inv.is_bedrock ? '<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">BEDROCK</span>' : ''}
-                </div>
-              </td>
-              <td class="py-2.5 px-3">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">${inv.badge}</span>
-              </td>
-              <td class="py-2.5 px-3 text-purple-400 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td class="py-2.5 px-3 text-neutral-300">$${inv.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-            </tr>
-          `).join('');
-        }
-      }
-    }
+function renderLeaderboard(list) {
+  const podium = document.getElementById('leaderboard-podium');
+  const tbody = document.getElementById('leaderboard-table-body');
 
-    if (window.lucide) {
-      lucide.createIcons();
-    }
-  } catch (err) {
-    console.error('Error loading leaderboard:', err);
+  if (podium && list.length >= 1) {
+    podium.innerHTML = list.slice(0, 3).map((p, idx) => {
+      const border = idx === 0 ? 'border-amber-500/50 bg-amber-950/20' : idx === 1 ? 'border-neutral-400/50 bg-neutral-900/30' : 'border-amber-700/50 bg-amber-950/10';
+      const medal = idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : '🥉 #3';
+      return `
+        <div class="p-4 rounded-2xl glass-panel ${border} text-center space-y-2">
+          <div class="font-bold text-sm text-amber-400">${medal}</div>
+          <img src="${p.avatar_url}" class="h-12 w-12 rounded-xl mx-auto border border-neutral-700 shadow-md" alt="${p.player_name}" />
+          <div class="font-bold text-xs text-white">${p.player_name}</div>
+          <div class="text-[10px] text-purple-400 font-mono font-bold">Aset: ${formatCurrency(p.assets_value)}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (tbody) {
+    tbody.innerHTML = list.map(p => `
+      <tr class="border-b border-neutral-900/60 hover:bg-neutral-900/30">
+        <td class="py-2.5 px-3 font-bold text-amber-400">#${p.rank}</td>
+        <td class="py-2.5 px-3 font-bold text-white flex items-center gap-2">
+          <img src="${p.avatar_url}" class="h-5 w-5 rounded" alt="" />
+          <span>${p.player_name}</span>
+        </td>
+        <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-primary border border-purple-500/20">${p.badge}</span></td>
+        <td class="py-2.5 px-3 font-bold text-purple-400">${formatCurrency(p.assets_value)}</td>
+        <td class="py-2.5 px-3 text-neutral-400">${formatCurrency(p.cash_balance)}</td>
+        <td class="py-2.5 px-3 text-right font-bold text-white">${formatCurrency(p.total_net_worth)}</td>
+      </tr>
+    `).join('');
   }
 }
 
-function podiumCardsBg(idx) {
-  if (idx === 0) return 'bg-gradient-to-b from-amber-500/10 via-neutral-950 to-neutral-950';
-  if (idx === 1) return 'bg-gradient-to-b from-slate-400/10 via-neutral-950 to-neutral-950';
-  return 'bg-gradient-to-b from-amber-800/10 via-neutral-950 to-neutral-950';
-}
+// =======================================================
+//   BOTTOM TAB SWITCHER
+// =======================================================
+function switchBottomTab(tabKey) {
+  const allTabs = ['portfolio', 'limit-orders', 'alerts', 'transfer', 'orderbook', 'history', 'leaderboard'];
 
-// =======================================================
-//   75% BULLISH / FAST-PUMP MOMENTUM ENGINE (KEHOKIAN 75%)
-// =======================================================
-function simulateMicroPriceMovements() {
-  Object.keys(state.assets).forEach(k => {
-    const asset = state.assets[k];
-    // 75% Win-Rate / Bullish Momentum: 75% Naik Cepat, 25% Koreksi Ringan
-    const isBull = Math.random() < 0.75;
-    const rate = isBull ? (Math.random() * 0.005 + 0.002) : -(Math.random() * 0.0025 + 0.0005);
-    const fluctuation = asset.price * rate;
-    const newPrice = Math.max(10, Math.round((asset.price + fluctuation) * 100) / 100);
-    asset.price = newPrice;
-    asset.changePercent = ((newPrice - asset.openPrice) / asset.openPrice) * 100;
+  allTabs.forEach(t => {
+    const btn = document.getElementById('tab-btn-' + t);
+    const content = document.getElementById('tab-content-' + t);
+    if (btn) {
+      btn.className = 'bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer';
+    }
+    if (content) {
+      content.classList.add('hidden');
+    }
   });
 
-  const active = state.assets[state.activeAsset];
-  active.history.push(active.price);
-  if (active.history.length > 15) active.history.shift();
+  const activeBtn = document.getElementById('tab-btn-' + tabKey);
+  const activeContent = document.getElementById('tab-content-' + tabKey);
 
-  renderAssetList();
-  updateActiveAssetDisplay();
-  updateChartData();
-  renderOrderbook();
-  renderPortfolioTable();
+  if (activeBtn) {
+    activeBtn.className = 'bottom-tab-btn active px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5 cursor-pointer';
+  }
+  if (activeContent) {
+    activeContent.classList.remove('hidden');
+  }
+
+  if (tabKey === 'limit-orders') loadLimitOrders();
+  if (tabKey === 'alerts') loadPriceAlerts();
+  if (tabKey === 'transfer') updateTransferBalanceHint();
+  if (tabKey === 'leaderboard') loadLeaderboard();
+
+  if (window.lucide) lucide.createIcons();
 }
 
 // =======================================================
-//   TOAST NOTIFICATION ENGINE
+//   UTILITIES
 // =======================================================
-function showToast(message, type = 'info') {
+function formatCurrency(num) {
+  return '$' + (parseFloat(num) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function showToast(type, message) {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
+  const isSuccess = type === 'success';
   const toast = document.createElement('div');
-  const colorClasses = type === 'success' 
-    ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200' 
-    : type === 'danger' 
-    ? 'bg-red-950/90 border-red-500/40 text-red-200' 
-    : 'bg-purple-950/90 border-purple-500/40 text-purple-200';
-
-  toast.className = `p-4 rounded-2xl border ${colorClasses} shadow-2xl backdrop-blur-md text-xs font-sans font-medium flex items-center gap-3 transition-all duration-300 transform translate-y-4 opacity-0 pointer-events-auto max-w-sm`;
+  toast.className = 'p-3.5 rounded-2xl glass-panel border ' + (isSuccess ? 'border-emerald-500/40 bg-emerald-950/90 text-emerald-200' : 'border-red-500/40 bg-red-950/90 text-red-200') + ' text-xs font-mono shadow-2xl flex items-center gap-3 pointer-events-auto transition transform translate-y-2 opacity-0';
   toast.innerHTML = `
-    <span class="h-2 w-2 rounded-full ${type === 'success' ? 'bg-emerald-400' : type === 'danger' ? 'bg-red-400' : 'bg-purple-400'} shrink-0"></span>
-    <span class="flex-1">${message}</span>
+    <i data-lucide="${isSuccess ? 'check-circle' : 'alert-circle'}" class="h-5 w-5 ${isSuccess ? 'text-emerald-400' : 'text-red-400'} shrink-0"></i>
+    <span class="flex-1 font-sans">${message}</span>
   `;
 
   container.appendChild(toast);
+  if (window.lucide) lucide.createIcons();
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-2', 'opacity-0');
+  });
 
   setTimeout(() => {
-    toast.classList.remove('translate-y-4', 'opacity-0');
-  }, 10);
-
-  setTimeout(() => {
-    toast.classList.add('opacity-0', 'translate-x-4');
+    toast.classList.add('translate-y-2', 'opacity-0');
     setTimeout(() => toast.remove(), 300);
   }, 4000);
 }
 
-// =======================================================
-//   PWA (PROGRESSIVE WEB APP) ENGINE
-// =======================================================
-let deferredPrompt = null;
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  const btn = document.getElementById('pwa-install-btn');
-  if (btn) {
-    btn.classList.remove('hidden');
-    btn.classList.add('flex');
-  }
-});
-
-async function triggerPwaInstall() {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      showToast('Aplikasi GenzSMP Trading berhasil dipasang di layar utama!', 'success');
-    }
-    deferredPrompt = null;
-    const btn = document.getElementById('pwa-install-btn');
-    if (btn) {
-      btn.classList.add('hidden');
-      btn.classList.remove('flex');
-    }
-  } else {
-    showToast('Untuk memasang di HP: Buka menu browser (titik 3) lalu pilih "Tambahkan ke Layar Utama" / "Add to Home Screen".', 'info');
+function triggerPwaInstall() {
+  if (window.deferredPrompt) {
+    window.deferredPrompt.prompt();
+    window.deferredPrompt.userChoice.then(() => {
+      window.deferredPrompt = null;
+    });
   }
 }
-
-// Expose all interactive functions explicitly on window
-window.openLoginModal = openLoginModal;
-window.closeLoginModal = closeLoginModal;
-window.handleLoginSubmit = handleLoginSubmit;
-window.promptPinModal = promptPinModal;
-window.openPinModal = promptPinModal;
-window.closePinModal = closePinModal;
-window.handlePinSubmit = handlePinSubmit;
-window.switchBottomTab = switchBottomTab;
-window.selectAsset = selectAsset;
-window.setTradeType = setTradeType;
-window.setPercentageAmount = setPercentageAmount;
-window.setTimeframe = setTimeframe;
-window.calculateTradeCost = calculateTradeCost;
-window.triggerPwaInstall = triggerPwaInstall;
-window.loginPlayer = loginPlayer;
-

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>GenzSMP Trading Terminal — Portal Investasi Crypto & Komoditas In-Game</title>
-    <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung dengan akun Minecraft, Vault Economy, dan PIN Keamanan 6-Digit." />
+    <meta name="description" content="Terminal trading crypto dan komoditas in-game resmi GenzSMP. Terhubung langsung dengan akun Minecraft, Vault Economy, PIN Keamanan, Limit Order, P2P Transfer, dan Price Alerts." />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
 
     <!-- Favicon & Touch Icons -->
@@ -28,7 +28,10 @@
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@0.475.0/dist/umd/lucide.min.js"></script>
 
-    <!-- Chart.js CDN -->
+    <!-- TradingView Lightweight Charts CDN -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+
+    <!-- Chart.js CDN (Fallback & Secondary) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Custom Tailwind Configuration -->
@@ -58,7 +61,6 @@
 
     <!-- Custom Styles Matching GenzSMP Design System -->
     <style>
-      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -82,10 +84,6 @@
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
       }
 
-      .glass-panel-hover {
-        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-
       .glass-panel-hover:hover {
         border-color: rgba(168, 85, 247, 0.3);
         background: rgba(22, 22, 22, 0.9);
@@ -95,7 +93,6 @@
         text-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
       }
 
-      /* Ticker animation */
       @keyframes tickerSlide {
         0% { transform: translateX(0); }
         100% { transform: translateX(-50%); }
@@ -111,7 +108,6 @@
         animation-play-state: paused;
       }
 
-      /* Shake animation for invalid PIN */
       @keyframes shake {
         0%, 100% { transform: translateX(0); }
         20%, 60% { transform: translateX(-6px); }
@@ -145,7 +141,7 @@
             />
             <div class="flex flex-col">
               <span class="font-display text-xs sm:text-lg font-black tracking-wider uppercase text-white leading-tight">
-                {{ $serverInfo['name'] }}<span class="text-primary">{{ $serverInfo['suffix'] }}</span>
+                {{ ['name'] }}<span class="text-primary">{{ ['suffix'] }}</span>
               </span>
               <span class="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-primary/80">Trading Terminal Pro</span>
             </div>
@@ -189,7 +185,7 @@
                   </span>
                 </div>
                 <div class="flex items-center gap-1 sm:gap-2">
-                  <span id="player-cash-display" class="font-mono text-[11px] sm:text-xs font-black text-emerald-400">$0.00</span>
+                  <span id="player-cash-display" class="font-mono text-[11px] sm:text-xs font-black text-emerald-400">bash.00</span>
                   <span id="pin-status-badge" class="hidden sm:inline text-[9px] font-mono text-neutral-500">● PIN: -</span>
                 </div>
               </div>
@@ -236,12 +232,11 @@
         </div>
         <div class="overflow-hidden relative flex-1">
           <div id="news-ticker" class="animate-ticker text-neutral-300">
-            <span class="mx-6"><strong class="text-emerald-400">[BULLISH]</strong> BTC Market: Sentimen positif mendorong kenaikan harga +4.2%</span>
-            <span class="mx-6"><strong class="text-cyan-400">[MINING]</strong> Diamond Mining Spike: Pasokan DIA stabil di level $245</span>
-            <span class="mx-6"><strong class="text-amber-400">[SECURITY]</strong> Sistem PIN Keamanan: Transaksi Buy/Sell dijamin aman dengan 6-digit PIN in-game</span>
-            <span class="mx-6"><strong class="text-purple-400">[LIQUIDITY]</strong> ETH Smart Economy: Likuiditas likuid di pasar in-game GenzSMP</span>
-            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> Pajak protokol: 8% (BTC/ETH) & 5% (GLD/DIA/EMD) otomatis diterapkan pada transaksi aset</span>
-            <span class="mx-6"><strong class="text-emerald-400">[ANTI-WHALE]</strong> Rate-limit 5 detik melindungi stabilitas likuiditas pasar</span>
+            <span class="mx-6"><strong class="text-emerald-400">[BULLISH]</strong> BTC Server Spot Market: Sentimen positif mendorong pergerakan harga real-time</span>
+            <span class="mx-6"><strong class="text-purple-400">[LIMIT ORDER]</strong> Fitur Limit Order Aktif: Pasang target beli/jual otomatis saat harga tercapai</span>
+            <span class="mx-6"><strong class="text-cyan-400">[P2P TRANSFER]</strong> Transfer Aset Antar Pemain kini dapat dilakukan di web &amp; in-game (/invest transfer)</span>
+            <span class="mx-6"><strong class="text-amber-400">[PRICE ALERT]</strong> In-Game Alerts: Notifikasi suara &amp; title in-game saat koin mencapai harga target (/invest alert)</span>
+            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> Pajak protokol: 8% (BTC/ETH) &amp; 5% (GLD/DIA/EMD) otomatis diterapkan pada transaksi</span>
           </div>
         </div>
       </div>
@@ -249,15 +244,17 @@
       <!-- MAIN TRADING WORKSPACE -->
       <main class="flex-1 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-[1600px] w-full mx-auto">
 
-        <!-- COLUMN 1: ASSET WATCHLIST & SELECTOR (3 Cols on Desktop) -->
+        <!-- COLUMN 1: ASSET WATCHLIST & QUICK ACTIONS (3 Cols on Desktop) -->
         <div class="lg:col-span-3 space-y-4">
           <div class="glass-panel rounded-2xl p-4 space-y-3">
             <div class="flex items-center justify-between pb-2 border-b border-neutral-800/80">
               <div class="flex items-center gap-2">
                 <i data-lucide="trending-up" class="h-4 w-4 text-primary"></i>
-                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Pasar Aset In-Game</h2>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-white">Pasar Aset Realtime</h2>
               </div>
-              <span class="text-[10px] text-neutral-500 font-mono">5 Aset Aktif</span>
+              <span class="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Server
+              </span>
             </div>
 
             <!-- Asset List -->
@@ -266,19 +263,39 @@
             </div>
           </div>
 
+          <!-- Quick Action Buttons: Transfer & Price Alert -->
+          <div class="grid grid-cols-2 gap-2">
+            <button 
+              onclick="switchBottomTab('transfer')" 
+              class="p-3 rounded-2xl glass-panel glass-panel-hover flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-300 hover:text-white transition cursor-pointer"
+            >
+              <i data-lucide="send" class="h-4 w-4 text-primary"></i>
+              <span>Transfer Aset</span>
+            </button>
+            <button 
+              onclick="switchBottomTab('alerts')" 
+              class="p-3 rounded-2xl glass-panel glass-panel-hover flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-300 hover:text-white transition cursor-pointer"
+            >
+              <i data-lucide="bell-ring" class="h-4 w-4 text-amber-400"></i>
+              <span>Price Alert</span>
+            </button>
+          </div>
+
           <!-- PIN Info & Security Guide Card -->
           <div class="glass-panel rounded-2xl p-4 space-y-3">
             <h3 class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
-              <i data-lucide="shield-check" class="h-4 w-4"></i> Panduan PIN Keamanan 6-Digit
+              <i data-lucide="shield-check" class="h-4 w-4"></i> Panduan Perintah In-Game
             </h3>
             <p class="text-[11px] text-neutral-400 leading-relaxed">
-              Untuk melindungi akun Anda dari transaksi liar, eksekusi Buy & Sell di web mewajibkan memasukkan 6-digit PIN in-game.
+              Seluruh fitur web dapat dijalankan langsung di in-game chat Minecraft:
             </p>
-            <div class="bg-neutral-950 p-3 rounded-xl border border-neutral-900 text-xs font-mono space-y-1">
-              <div class="text-primary font-bold">/invest setpin &lt;6-digit&gt;</div>
-              <div class="text-[10px] text-neutral-500">Atur PIN baru (Contoh: /invest setpin 123456)</div>
-              <div class="text-primary font-bold pt-1">/invest changepin &lt;old&gt; &lt;new&gt;</div>
-              <div class="text-[10px] text-neutral-500">Ganti PIN keamanan lama</div>
+            <div class="bg-neutral-950 p-3 rounded-xl border border-neutral-900 text-xs font-mono space-y-1.5">
+              <div class="text-primary font-bold">/invest web</div>
+              <div class="text-[10px] text-neutral-500">Buka link web trading terminal</div>
+              <div class="text-primary font-bold pt-1">/invest transfer &lt;player&gt; &lt;asset&gt; &lt;amount&gt;</div>
+              <div class="text-[10px] text-neutral-500">Kirim koin ke pemain lain (Fee 2%)</div>
+              <div class="text-primary font-bold pt-1">/invest alert &lt;asset&gt; &lt;harga&gt;</div>
+              <div class="text-[10px] text-neutral-500">Pasang notifikasi suara saat harga menyentuh target</div>
             </div>
           </div>
         </div>
@@ -310,42 +327,64 @@
 
               <!-- Price & 24h Change -->
               <div class="text-right">
-                <div id="active-asset-price" class="font-mono text-2xl font-black text-emerald-400">$1,020.00</div>
+                <div id="active-asset-price" class="font-mono text-2xl font-black text-emerald-400">,020.00</div>
                 <div id="active-asset-change" class="text-xs font-mono font-bold text-emerald-400 flex items-center justify-end gap-1">
                   <i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i> +4.08% (24h)
                 </div>
               </div>
             </div>
 
-            <!-- Timeframe Controls & Mini Stats -->
+            <!-- Timeframe & Chart Style Controls -->
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
-                <button onclick="setTimeframe('1M')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1M</button>
-                <button onclick="setTimeframe('5M')" class="tf-btn active px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition">5M</button>
-                <button onclick="setTimeframe('15M')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">15M</button>
-                <button onclick="setTimeframe('1H')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1H</button>
-                <button onclick="setTimeframe('1D')" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
+                <button onclick="setTimeframe('1m')" id="tf-1m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1M</button>
+                <button onclick="setTimeframe('5m')" id="tf-5m" class="tf-btn active px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition">5M</button>
+                <button onclick="setTimeframe('15m')" id="tf-15m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">15M</button>
+                <button onclick="setTimeframe('1h')" id="tf-1h" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1H</button>
+                <button onclick="setTimeframe('1d')" id="tf-1d" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
+              </div>
+
+              <!-- Chart Style Selector: Candlestick vs Line -->
+              <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
+                <button onclick="setChartStyle('candle')" id="chart-style-candle" class="px-2.5 py-1 rounded-lg bg-purple-600 text-white font-bold flex items-center gap-1 transition">
+                  <i data-lucide="candlestick-chart" class="h-3.5 w-3.5"></i> Candle (OHLC)
+                </button>
+                <button onclick="setChartStyle('line')" id="chart-style-line" class="px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 transition">
+                  <i data-lucide="line-chart" class="h-3.5 w-3.5"></i> Line
+                </button>
               </div>
 
               <div class="flex items-center gap-4 text-xs font-mono text-neutral-400">
-                <div>24h High: <span id="stat-high" class="text-white font-bold">$1,080</span></div>
-                <div>24h Low: <span id="stat-low" class="text-white font-bold">$950</span></div>
-                <div>Vol: <span id="stat-vol" class="text-primary font-bold">$124.5K</span></div>
+                <div>High: <span id="stat-high" class="text-white font-bold">,080</span></div>
+                <div>Low: <span id="stat-low" class="text-white font-bold">50</span></div>
+                <div>Vol: <span id="stat-vol" class="text-primary font-bold">24.5K</span></div>
               </div>
             </div>
 
-            <!-- Chart Canvas Container -->
-            <div class="relative h-[360px] w-full pt-2">
-              <canvas id="tradingChart"></canvas>
+            <!-- Candlestick / TradingView Chart Container -->
+            <div id="tv-chart-wrapper" class="relative h-[380px] w-full pt-2 rounded-xl overflow-hidden bg-neutral-950/60 border border-neutral-900">
+              <div id="tv-chart-container" class="w-full h-full"></div>
+              <div id="chartjs-container" class="hidden w-full h-full p-2">
+                <canvas id="tradingChart"></canvas>
+              </div>
             </div>
           </div>
 
-          <!-- Bottom Tabs: Portfolio & Orderbook & Logs -->
+          <!-- Bottom Tabs: Portfolio, Limit Orders, Price Alerts, Transfer, Orderbook, Logs, Leaderboard -->
           <div class="glass-panel rounded-2xl p-5 space-y-4">
-            <div class="border-b border-neutral-800/80 pb-3">
-              <div class="flex flex-wrap gap-2">
+            <div class="border-b border-neutral-800/80 pb-3 overflow-x-auto">
+              <div class="flex items-center gap-2 min-w-max">
                 <button onclick="switchBottomTab('portfolio')" id="tab-btn-portfolio" class="bottom-tab-btn active px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-primary text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="pie-chart" class="h-3.5 w-3.5"></i> Portofolio
+                </button>
+                <button onclick="switchBottomTab('limit-orders')" id="tab-btn-limit-orders" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="clock" class="h-3.5 w-3.5"></i> Limit Orders
+                </button>
+                <button onclick="switchBottomTab('alerts')" id="tab-btn-alerts" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="bell" class="h-3.5 w-3.5"></i> Price Alerts
+                </button>
+                <button onclick="switchBottomTab('transfer')" id="tab-btn-transfer" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="send" class="h-3.5 w-3.5"></i> Transfer P2P
                 </button>
                 <button onclick="switchBottomTab('orderbook')" id="tab-btn-orderbook" class="bottom-tab-btn px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-neutral-900/60 text-neutral-400 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
                   <i data-lucide="book-open" class="h-3.5 w-3.5"></i> Orderbook
@@ -379,7 +418,132 @@
               </div>
             </div>
 
-            <!-- Tab Content 2: Orderbook (Bids / Asks) -->
+            <!-- Tab Content 2: Limit Orders -->
+            <div id="tab-content-limit-orders" class="hidden space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-neutral-400">Daftar Antrean Limit Order</span>
+                <button onclick="loadLimitOrders()" class="text-[11px] text-primary hover:underline flex items-center gap-1">
+                  <i data-lucide="refresh-cw" class="h-3 w-3"></i> Refresh
+                </button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr class="border-b border-neutral-800 text-neutral-400 font-sans uppercase text-[10px]">
+                      <th class="py-2 px-3">Waktu</th>
+                      <th class="py-2 px-3">Tipe</th>
+                      <th class="py-2 px-3">Aset &amp; Jumlah</th>
+                      <th class="py-2 px-3">Target Harga</th>
+                      <th class="py-2 px-3">Status</th>
+                      <th class="py-2 px-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="limit-orders-table-body" class="divide-y divide-neutral-900 text-neutral-300">
+                    <tr><td colspan="6" class="text-center py-6 text-neutral-500 font-sans">Belum ada limit order aktif. Pasang di panel order kanan.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Tab Content 3: Price Alerts -->
+            <div id="tab-content-alerts" class="hidden space-y-4">
+              <!-- Create Alert Form -->
+              <form onsubmit="handlePriceAlertSubmit(event)" class="p-4 rounded-xl bg-neutral-950/80 border border-neutral-900 space-y-3">
+                <div class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <i data-lucide="bell-plus" class="h-4 w-4"></i> Pasang Price Alert Baru
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+                  <div>
+                    <label class="block text-[10px] text-neutral-400 uppercase mb-1">Aset</label>
+                    <select id="alert-asset-select" class="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500">
+                      <option value="BTC">Bitcoin (BTC)</option>
+                      <option value="ETH">Ethereum (ETH)</option>
+                      <option value="GLD">Gold (GLD)</option>
+                      <option value="DIA">Diamond (DIA)</option>
+                      <option value="EMD">Emerald (EMD)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-[10px] text-neutral-400 uppercase mb-1">Target Harga ($)</label>
+                    <input type="number" id="alert-target-price-input" step="any" min="0.01" placeholder="Contoh: 1100" required class="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500" />
+                  </div>
+                  <div class="flex items-end">
+                    <button type="submit" class="w-full py-2 px-4 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold uppercase tracking-wider text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/10">
+                      <i data-lucide="bell" class="h-3.5 w-3.5"></i> Pasang Alert
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <!-- List Alerts -->
+              <div class="space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-neutral-400 block">Daftar Price Alert Aktif</span>
+                <div id="price-alerts-list" class="space-y-2 font-mono text-xs max-h-[220px] overflow-y-auto">
+                  <div class="text-center py-6 text-neutral-500 font-sans">Belum ada price alert yang terpasang.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab Content 4: P2P Asset Transfer -->
+            <div id="tab-content-transfer" class="hidden space-y-4">
+              <form onsubmit="handleTransferSubmit(event)" class="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-900 space-y-4 max-w-lg mx-auto">
+                <div class="text-center space-y-1">
+                  <div class="mx-auto h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-primary">
+                    <i data-lucide="send" class="h-5 w-5"></i>
+                  </div>
+                  <h3 class="font-bold text-white text-sm uppercase tracking-wider">Transfer Aset Antar Pemain (P2P)</h3>
+                  <p class="text-[11px] text-neutral-400">Kirim aset crypto/komoditas langsung ke sesama pemain server GenzSMP.</p>
+                </div>
+
+                <div class="space-y-3 text-xs font-mono">
+                  <div>
+                    <label class="block text-[10px] text-neutral-400 uppercase mb-1">Username Penerima</label>
+                    <input type="text" id="transfer-receiver-input" placeholder="Gamertag Minecraft Penerima" required class="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-[10px] text-neutral-400 uppercase mb-1">Pilih Aset</label>
+                      <select id="transfer-asset-select" onchange="updateTransferBalanceHint()" class="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary">
+                        <option value="BTC">BTC (Bitcoin)</option>
+                        <option value="ETH">ETH (Ethereum)</option>
+                        <option value="GLD">GLD (Gold)</option>
+                        <option value="DIA">DIA (Diamond)</option>
+                        <option value="EMD">EMD (Emerald)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div class="flex justify-between items-center mb-1">
+                        <label class="text-[10px] text-neutral-400 uppercase">Jumlah</label>
+                        <span id="transfer-owned-hint" class="text-[9px] text-neutral-500 font-mono">Saldo: 0.00</span>
+                      </div>
+                      <input type="number" id="transfer-amount-input" step="any" min="0.01" placeholder="0.00" required oninput="calculateTransferFee()" class="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-primary" />
+                    </div>
+                  </div>
+
+                  <div class="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800 space-y-1.5 text-[11px]">
+                    <div class="flex justify-between text-neutral-400">
+                      <span>Pajak Protokol Transfer (2%):</span>
+                      <span id="transfer-fee-display" class="text-yellow-400">0.00</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-white">
+                      <span>Penerima Menerima Bersih:</span>
+                      <span id="transfer-net-display" class="text-emerald-400">0.00</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] text-neutral-400 uppercase mb-1">PIN Keamanan 6-Digit</label>
+                    <input type="password" id="transfer-pin-input" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" required class="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white text-center tracking-widest text-base focus:outline-none focus:border-primary" />
+                  </div>
+
+                  <button type="submit" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-bold uppercase tracking-wider text-xs transition cursor-pointer shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2">
+                    <i data-lucide="lock" class="h-4 w-4"></i> Konfirmasi Transfer Aset
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Tab Content 5: Orderbook (Bids / Asks) -->
             <div id="tab-content-orderbook" class="hidden grid grid-cols-2 gap-4 text-xs font-mono">
               <div class="space-y-2">
                 <div class="flex justify-between text-neutral-500 font-sans uppercase font-bold text-[10px] pb-1 border-b border-neutral-900">
@@ -398,14 +562,14 @@
               </div>
             </div>
 
-            <!-- Tab Content 3: Trade History Logs -->
+            <!-- Tab Content 6: Trade History Logs -->
             <div id="tab-content-history" class="hidden space-y-2 max-h-[220px] overflow-y-auto font-mono text-xs">
               <div id="trade-history-list" class="space-y-1.5">
                 <div class="text-center py-6 text-neutral-500 font-sans">Belum ada transaksi pada sesi ini.</div>
               </div>
             </div>
 
-            <!-- Tab Content 4: Leaderboard Top 10 Investors -->
+            <!-- Tab Content 7: Leaderboard Top 10 Investors -->
             <div id="tab-content-leaderboard" class="hidden space-y-5">
               <!-- Top Metrics Bar -->
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -415,7 +579,7 @@
                   </div>
                   <div>
                     <span class="text-[10px] uppercase font-bold text-neutral-500 block">Total Market Cap</span>
-                    <span id="lb-market-cap" class="text-xs font-mono font-bold text-white">$0.00</span>
+                    <span id="lb-market-cap" class="text-xs font-mono font-bold text-white">bash.00</span>
                   </div>
                 </div>
 
@@ -475,19 +639,32 @@
         <div class="lg:col-span-3 space-y-4">
           <div class="glass-panel rounded-2xl p-5 space-y-5 sticky top-24">
 
+            <!-- Order Mode Switcher: Market Order vs Limit Order -->
+            <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Tipe Order</span>
+              <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-[11px] font-mono">
+                <button type="button" onclick="setOrderMode('MARKET')" id="order-mode-market" class="px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition cursor-pointer">
+                  Market
+                </button>
+                <button type="button" onclick="setOrderMode('LIMIT')" id="order-mode-limit" class="px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition cursor-pointer">
+                  Limit Order
+                </button>
+              </div>
+            </div>
+
             <!-- BUY / SELL Switcher -->
             <div class="grid grid-cols-2 gap-2 bg-neutral-950 p-1.5 rounded-2xl border border-neutral-900">
               <button 
                 id="trade-tab-buy" 
                 onclick="setTradeType('BUY')" 
-                class="py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                class="py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition bg-emerald-600 text-white shadow-lg shadow-emerald-600/20 cursor-pointer"
               >
                 Beli (BUY)
               </button>
               <button 
                 id="trade-tab-sell" 
                 onclick="setTradeType('SELL')" 
-                class="py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white"
+                class="py-2.5 rounded-xl font-bold uppercase text-xs tracking-wider transition text-neutral-400 hover:text-white cursor-pointer"
               >
                 Jual (SELL)
               </button>
@@ -499,7 +676,7 @@
               <!-- Available Balance / Holdings Counter -->
               <div class="flex items-center justify-between text-xs font-mono">
                 <span class="text-neutral-400" id="balance-label">Saldo Kas Vault:</span>
-                <span id="form-available-balance" class="text-primary font-bold">$0.00</span>
+                <span id="form-available-balance" class="text-primary font-bold">bash.00</span>
               </div>
 
               <!-- Quantity Input -->
@@ -524,6 +701,26 @@
                 </div>
               </div>
 
+              <!-- Target Price Input (For Limit Order Only) -->
+              <div id="limit-price-group" class="hidden space-y-1.5">
+                <div class="flex justify-between items-center text-[11px] font-bold uppercase tracking-wider text-purple-400">
+                  <label>Target Harga Eksekusi ($)</label>
+                  <span class="font-mono text-neutral-500 text-[10px]">Auto-Trigger</span>
+                </div>
+                <div class="relative">
+                  <input 
+                    type="number" 
+                    id="trade-target-price-input" 
+                    step="any" 
+                    min="0.01" 
+                    placeholder="Harga Target $" 
+                    oninput="calculateTradeCost()"
+                    class="w-full bg-neutral-900/80 border border-purple-500/40 focus:border-purple-500 rounded-xl px-4 py-3 text-white font-mono text-base focus:outline-none placeholder-neutral-600"
+                  />
+                  <span class="absolute right-4 top-3.5 font-mono text-xs font-bold text-purple-400">USD</span>
+                </div>
+              </div>
+
               <!-- Percentage Shortcut Buttons -->
               <div class="grid grid-cols-4 gap-2 text-xs font-mono font-bold">
                 <button type="button" onclick="setPercentageAmount(0.25)" class="py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 transition">25%</button>
@@ -535,21 +732,21 @@
               <!-- Order Summary Breakdown -->
               <div class="p-3.5 rounded-xl bg-neutral-950/90 border border-neutral-900 space-y-2 text-xs font-mono">
                 <div class="flex justify-between">
-                  <span class="text-neutral-500">Harga Spot:</span>
-                  <span id="summary-unit-price" class="text-white">$1,020.00</span>
+                  <span class="text-neutral-500" id="summary-price-label">Harga Spot:</span>
+                  <span id="summary-unit-price" class="text-white">,020.00</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-neutral-500">Estimasi Subtotal:</span>
-                  <span id="summary-subtotal" class="text-white">$0.00</span>
+                  <span id="summary-subtotal" class="text-white">bash.00</span>
                 </div>
                 <div class="flex justify-between">
                   <span id="summary-tax-label" class="text-neutral-500">Protocol Tax (8%):</span>
-                  <span id="summary-tax" class="text-yellow-400">$0.00</span>
+                  <span id="summary-tax" class="text-yellow-400">bash.00</span>
                 </div>
                 <div class="h-px bg-neutral-900 my-1"></div>
                 <div class="flex justify-between text-sm font-bold">
                   <span class="text-neutral-300">Total Transaksi:</span>
-                  <span id="summary-total" class="text-primary">$0.00</span>
+                  <span id="summary-total" class="text-primary">bash.00</span>
                 </div>
               </div>
 
@@ -598,118 +795,92 @@
 
           <form onsubmit="handleLoginSubmit(event)" class="space-y-4 text-left">
             <div class="space-y-1.5">
-              <label class="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Username / Gamertag</label>
-              <div class="relative">
-                <input 
-                  type="text" 
-                  id="login-username-input" 
-                  placeholder="Contoh: SteveGenz atau .SteveGenz" 
-                  required
-                  class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3 sm:py-3.5 text-white font-mono text-sm focus:outline-none placeholder-neutral-600"
-                />
-              </div>
-            </div>
-
-            <!-- Login Error Notice -->
-            <div id="login-error-msg" class="hidden p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs leading-relaxed space-y-1">
-              <div class="font-bold flex items-center gap-1.5 text-red-400">
-                <i data-lucide="alert-circle" class="h-4 w-4 shrink-0"></i>
-                <span id="login-error-title">Akun Belum Terdaftar!</span>
-              </div>
-              <p id="login-error-text" class="text-[11px] text-neutral-300"></p>
-            </div>
-
-            <button 
-              type="submit" 
-              id="login-submit-btn"
-              class="w-full py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-purple-500/20"
-            >
-              Masuk & Buka Portofolio
-            </button>
-          </form>
-
-          <div class="pt-2 border-t border-neutral-900 flex justify-between items-center text-xs text-neutral-500">
-            <span>Server: <strong class="text-white font-mono">genzsmp.site</strong></span>
-            <button onclick="closeLoginModal()" class="hover:text-white transition cursor-pointer">Tutup</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ========================================================= -->
-      <!-- MODAL 2: 6-DIGIT PIN SECURITY MODAL (REQUIRED FOR TRADE)  -->
-      <!-- ========================================================= -->
-      <div id="pin-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
-        <div id="pin-modal-card" class="glass-panel max-w-md w-full rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-purple-500/30 text-center space-y-4 sm:space-y-5 shadow-2xl relative overflow-hidden">
-          <div class="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-purple-600/20 blur-3xl"></div>
-
-          <div class="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary to-purple-700 p-0.5 shadow-xl flex items-center justify-center text-white">
-            <i data-lucide="key-round" class="h-6 w-6 sm:h-8 sm:w-8"></i>
-          </div>
-
-          <div class="space-y-1">
-            <span class="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Verifikasi Transaksi
-            </span>
-            <h3 class="font-display text-xl font-black text-white uppercase">Masukkan 6-Digit PIN Trading</h3>
-            <p id="pin-modal-desc" class="text-xs text-neutral-400">
-              Konfirmasi eksekusi order <span id="pin-summary-action" class="font-bold text-white">BUY 1.00 BTC</span>
-            </p>
-          </div>
-
-          <!-- Transaction Mini Summary Box -->
-          <div class="bg-neutral-950 p-3 rounded-2xl border border-neutral-900 text-xs font-mono flex justify-between items-center">
-            <div>
-              <div class="text-[10px] text-neutral-500 uppercase">Total Transaksi</div>
-              <div id="pin-summary-total" class="font-bold text-primary text-sm">$1,040.40</div>
-            </div>
-            <div class="text-right">
-              <div class="text-[10px] text-neutral-500 uppercase">Akun</div>
-              <div id="pin-summary-player" class="font-bold text-white">SteveGenz</div>
-            </div>
-          </div>
-
-          <!-- PIN Input Form -->
-          <form onsubmit="handlePinSubmit(event)" class="space-y-4">
-            <div class="space-y-2">
-              <label class="text-[11px] font-bold uppercase tracking-wider text-neutral-400">PIN Keamanan (6 Angka)</label>
+              <label class="block text-xs font-bold uppercase tracking-wider text-neutral-300">
+                Gamertag / Username
+              </label>
               <input 
-                type="password" 
-                id="pin-input" 
-                maxlength="6" 
-                pattern="[0-9]{6}" 
-                inputmode="numeric" 
-                placeholder="● ● ● ● ● ●" 
-                required 
-                autofocus
-                class="w-full text-center tracking-[0.75em] bg-neutral-900 border border-neutral-800 focus:border-primary rounded-2xl py-3.5 text-white font-mono text-xl font-bold focus:outline-none"
+                type="text" 
+                id="login-username-input" 
+                placeholder="Contoh: Dzakiri atau .BedrockPlayer"
+                required
+                class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3 text-white text-sm focus:outline-none transition"
               />
-              <p id="pin-error-msg" class="hidden text-xs text-red-400 font-medium"></p>
             </div>
 
-            <!-- Notice if PIN is not set -->
-            <div id="pin-not-set-notice" class="hidden text-left p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs space-y-1">
-              <div class="font-bold flex items-center gap-1.5">
-                <i data-lucide="alert-triangle" class="h-4 w-4"></i> PIN Belum Diatur di In-Game!
-              </div>
-              <p class="text-[11px] text-neutral-300">
-                Silakan masuk ke server Minecraft dan ketik: <code class="text-primary font-bold font-mono">/invest setpin &lt;6-digit&gt;</code> (Contoh: <code class="text-white font-mono">/invest setpin 123456</code>).
-              </p>
-            </div>
-
-            <div class="flex gap-3 pt-2">
+            <div class="flex items-center gap-2 pt-2">
               <button 
                 type="button" 
-                onclick="closePinModal()" 
-                class="flex-1 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white font-bold text-xs uppercase tracking-wider transition"
+                onclick="closeLoginModal()" 
+                class="flex-1 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-bold uppercase text-xs tracking-wider transition cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 type="submit" 
-                id="pin-confirm-btn"
-                class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20"
+                id="login-submit-btn" 
+                class="flex-1 py-3 rounded-xl bg-gradient-to-r from-primary to-purple-600 text-white font-bold uppercase text-xs tracking-wider shadow-lg shadow-purple-500/25 hover:brightness-110 active:scale-95 transition cursor-pointer"
               >
-                Konfirmasi & Beli
+                Masuk
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ========================================================= -->
+      <!-- MODAL 2: 6-DIGIT PIN CONFIRMATION MODAL                   -->
+      <!-- ========================================================= -->
+      <div id="pin-modal" class="hidden fixed inset-0 z-50 items-center justify-center p-4 bg-black/90 backdrop-blur-xl">
+        <div class="glass-panel max-w-md w-full rounded-2xl sm:rounded-3xl p-5 sm:p-7 border border-purple-500/30 text-center space-y-4 sm:space-y-6 shadow-2xl relative overflow-hidden">
+          <div class="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-primary/20 blur-3xl"></div>
+
+          <div class="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-xl">
+            <i data-lucide="shield-check" class="h-6 w-6 sm:h-8 sm:w-8"></i>
+          </div>
+
+          <div class="space-y-1.5">
+            <h2 class="font-display text-xl sm:text-2xl font-black text-white uppercase" id="pin-modal-title">Konfirmasi PIN Keamanan</h2>
+            <p class="text-xs text-neutral-400" id="pin-modal-desc">
+              Masukkan 6-digit PIN keamanan akun Minecraft Anda untuk memproses eksekusi transaksi.
+            </p>
+          </div>
+
+          <!-- Order Summary Badge in Modal -->
+          <div id="pin-modal-order-summary" class="p-3 rounded-xl bg-neutral-950/80 border border-neutral-900 text-xs font-mono flex justify-between items-center">
+            <span class="text-neutral-400" id="pin-summary-action">BELI 0 BTC</span>
+            <span class="text-primary font-bold" id="pin-summary-cost">bash.00</span>
+          </div>
+
+          <form onsubmit="handlePinSubmit(event)" id="pin-form" class="space-y-4">
+            <div class="space-y-2">
+              <input 
+                type="password" 
+                id="trade-pin-input" 
+                maxlength="6" 
+                pattern="[0-9]{6}" 
+                inputmode="numeric" 
+                placeholder="••••••" 
+                required
+                autocomplete="off"
+                class="w-full bg-neutral-900 border border-neutral-800 focus:border-primary rounded-xl px-4 py-3 text-white text-center font-mono text-2xl tracking-[0.4em] focus:outline-none transition shadow-inner"
+              />
+              <p id="pin-error-text" class="hidden text-xs text-red-400 font-mono"></p>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2">
+              <button 
+                type="button" 
+                onclick="closePinModal()" 
+                class="flex-1 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 font-bold uppercase text-xs tracking-wider transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit" 
+                id="pin-confirm-btn" 
+                class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold uppercase text-xs tracking-wider shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <i data-lucide="check" class="h-4 w-4"></i> Konfirmasi
               </button>
             </div>
           </form>
@@ -717,50 +888,31 @@
       </div>
 
       <!-- TOAST NOTIFICATION CONTAINER -->
-      <div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+      <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+      <!-- FOOTER -->
+      <footer class="border-t border-neutral-900 py-6 px-4 text-center text-xs text-neutral-500 font-mono mt-auto">
+        <p>© 2026 {{ ['name'] }} {{ ['suffix'] }} Trading Terminal Pro. Zero-Trust Security &amp; Outbound HTTPS Sync Bridge.</p>
+      </footer>
 
     </div>
 
-    <!-- Inject Initial Config -->
+    <!-- Pass Global Config to Client JavaScript -->
     <script>
       window.TRADING_CONFIG = {
-        token: "{{ $token }}",
-        player: "{{ $player }}",
-        isValidAccess: {{ $isValidAccess ? 'true' : 'false' }},
-        wsPort: {{ $tradingConfig['ws_port'] }},
-        wsHost: "{{ $tradingConfig['ws_host'] }}",
-        taxPercent: {{ $tradingConfig['tax_percent'] }},
-        cooldownSeconds: {{ $tradingConfig['cooldown_seconds'] }},
-        sessionTtlSeconds: {{ $tradingConfig['session_ttl_seconds'] }},
-        assets: @json($tradingConfig['assets']),
-        csrfToken: "{{ csrf_token() }}"
+        csrfToken: '{{ csrf_token() }}',
+        serverName: '{{ ['name'] }}',
+        initialPrices: @json( ?? [
+            'BTC' => 1020.00,
+            'ETH' => 510.00,
+            'GLD' => 105.00,
+            'DIA' => 245.00,
+            'EMD' => 175.00,
+        ]),
       };
     </script>
-    <!-- Force NUKE all old Service Workers and caches -->
-    <script>
-      (async function() {
-        // 1. Unregister ALL service workers first
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const reg of regs) {
-            await reg.unregister();
-          }
-        }
-        // 2. Delete ALL caches
-        if ('caches' in window) {
-          const names = await caches.keys();
-          for (const name of names) {
-            await caches.delete(name);
-          }
-        }
-        // 3. Re-register fresh SW v2
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('/sw.js');
-        }
-      })();
-    </script>
 
-    <!-- Trading Controller Script (Cache-Busted) -->
+    <!-- Custom Client-Side Trading Controller Script -->
     <script src="/js/trading.js?v={{ time() }}"></script>
   </body>
 </html>

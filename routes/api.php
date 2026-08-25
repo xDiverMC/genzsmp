@@ -20,9 +20,17 @@ Route::middleware(['throttle:60,1'])->group(function () {
     });
 });
 
-Route::middleware(['throttle:30,1'])->prefix('trading')->group(function () {
+Route::middleware(['throttle:60,1'])->prefix('trading')->group(function () {
     Route::post('/login', [TradingApiController::class, 'login']);
-    Route::post('/trade', [TradingApiController::class, 'executeTrade'])->middleware('throttle:15,1');
+    Route::get('/market-data', [TradingApiController::class, 'getMarketData']);
+    Route::post('/trade', [TradingApiController::class, 'executeTrade'])->middleware('throttle:30,1');
+    Route::post('/limit-order', [TradingApiController::class, 'createLimitOrder'])->middleware('throttle:30,1');
+    Route::get('/limit-orders', [TradingApiController::class, 'getLimitOrders']);
+    Route::post('/cancel-limit-order', [TradingApiController::class, 'cancelLimitOrder']);
+    Route::post('/transfer', [TradingApiController::class, 'transferAsset'])->middleware('throttle:20,1');
+    Route::post('/alert', [TradingApiController::class, 'createPriceAlert']);
+    Route::get('/alerts', [TradingApiController::class, 'getPriceAlerts']);
+    Route::post('/cancel-alert', [TradingApiController::class, 'cancelPriceAlert']);
     Route::get('/user/{playerName}', [TradingApiController::class, 'getUserState']);
     Route::get('/leaderboard', [TradingApiController::class, 'getLeaderboard']);
 });
@@ -32,5 +40,9 @@ Route::prefix('invest')->group(function () {
     Route::post('/sync', [\App\Http\Controllers\Api\InvestSyncController::class, 'sync']);
     Route::post('/setpin', [\App\Http\Controllers\Api\InvestSyncController::class, 'setPin']);
     Route::post('/trade', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameTrade']);
+    Route::post('/transfer', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameTransfer']);
+    Route::post('/alert/set', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameSetAlert']);
+    Route::post('/alert/list', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameListAlerts']);
+    Route::post('/alert/remove', [\App\Http\Controllers\Api\InvestSyncController::class, 'inGameRemoveAlert']);
 });
 
