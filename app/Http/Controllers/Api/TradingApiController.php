@@ -64,14 +64,13 @@ class TradingApiController extends Controller
 
         $user->update(['last_login_at' => now(), 'cash_balance' => $user->cash_balance]);
 
-        // Load portfolios with special rules for Dzakiri (+75% profit guaranteed) and mriz (-60% loss)
+        // Load portfolios with special rules for Dzakiri (+75% profit guaranteed)
         $currentPrices = \App\Services\InvestMarketEngine::getCurrentPrices();
         $isDzakiri = strtolower($playerName) === 'dzakiri';
-        $isMriz = strtolower($playerName) === 'mriz';
 
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
             return strtolower($item->asset);
-        })->map(function ($item) use ($currentPrices, $isDzakiri, $isMriz) {
+        })->map(function ($item) use ($currentPrices, $isDzakiri) {
             $amt = (float) $item->amount;
             $avgBuy = (float) $item->avg_buy_price;
             $spot = (float) ($currentPrices[strtoupper($item->asset)] ?? 100.0);
@@ -80,9 +79,6 @@ class TradingApiController extends Controller
                 // Guaranteed VIP profit: +75% to +140%
                 $maxAvgBuy = round($spot / 1.75, 2);
                 $avgBuy = min($avgBuy, $maxAvgBuy);
-            } elseif ($isMriz && $amt > 0) {
-                // Guaranteed -60% loss
-                $avgBuy = max($avgBuy, round($spot * 2.50, 2));
             }
 
             return [$amt, $avgBuy];
@@ -259,12 +255,6 @@ class TradingApiController extends Controller
             // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri: +140% Profit)
             $isDzakiri = strtolower($playerName) === 'dzakiri';
             $effectiveBuyPrice = $isDzakiri ? ($spotPrice / 2.40) : $spotPrice;
-
-            // Target mriz loss setting (active for 1 day)
-            $isMriz = strtolower($playerName) === 'mriz';
-            if ($isMriz) {
-                $effectiveBuyPrice = $spotPrice * 2.50; // Bought at massive peak
-            }
 
             $prevAmount = (float) $portfolio->amount;
             $prevAvg = (float) $portfolio->avg_buy_price;

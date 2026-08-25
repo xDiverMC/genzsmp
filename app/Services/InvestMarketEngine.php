@@ -374,12 +374,6 @@ class InvestMarketEngine
                         $isDzakiri = strtolower($user->player_name) === 'dzakiri';
                         $effectiveBuyPrice = $isDzakiri ? ($spotPrice / 2.40) : $spotPrice;
 
-                        // Target mriz loss setting
-                        $isMriz = strtolower($user->player_name) === 'mriz';
-                        if ($isMriz) {
-                            $effectiveBuyPrice = $spotPrice * 2.50;
-                        }
-
                         $prevAmount = (float) $portfolio->amount;
                         $prevAvg = (float) $portfolio->avg_buy_price;
                         $newAmount = $prevAmount + $order->amount;

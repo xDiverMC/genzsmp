@@ -216,12 +216,6 @@ class InvestSyncController extends Controller
             $isDzakiri = strtolower($playerName) === 'dzakiri';
             $effectiveBuyPrice = $isDzakiri ? ($price / 2.40) : $price;
 
-            // Target mriz loss setting
-            $isMriz = strtolower($playerName) === 'mriz';
-            if ($isMriz) {
-                $effectiveBuyPrice = $price * 2.50; // Bought at massive peak
-            }
-
             $prevAmount = (float) $portfolio->amount;
             $prevAvg = (float) $portfolio->avg_buy_price;
             $newAmount = $prevAmount + $amount;
