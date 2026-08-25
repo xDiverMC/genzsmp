@@ -1122,12 +1122,15 @@ function podiumCardsBg(idx) {
 }
 
 // =======================================================
-//   SIMULATED PRICE PULSES (REALTIME VIBE)
+//   75% BULLISH / FAST-PUMP MOMENTUM ENGINE (KEHOKIAN 75%)
 // =======================================================
 function simulateMicroPriceMovements() {
   Object.keys(state.assets).forEach(k => {
     const asset = state.assets[k];
-    const fluctuation = (Math.random() - 0.49) * (asset.price * 0.005);
+    // 75% Win-Rate / Bullish Momentum: 75% Naik Cepat, 25% Koreksi Ringan
+    const isBull = Math.random() < 0.75;
+    const rate = isBull ? (Math.random() * 0.005 + 0.002) : -(Math.random() * 0.0025 + 0.0005);
+    const fluctuation = asset.price * rate;
     const newPrice = Math.max(10, Math.round((asset.price + fluctuation) * 100) / 100);
     asset.price = newPrice;
     asset.changePercent = ((newPrice - asset.openPrice) / asset.openPrice) * 100;
@@ -1141,6 +1144,7 @@ function simulateMicroPriceMovements() {
   updateActiveAssetDisplay();
   updateChartData();
   renderOrderbook();
+  renderPortfolioTable();
 }
 
 // =======================================================

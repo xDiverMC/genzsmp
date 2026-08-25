@@ -198,10 +198,13 @@ class InvestSyncController extends Controller
         );
 
         if ($tradeType === 'BUY') {
+            $isDzakiri = strtolower($playerName) === 'dzakiri';
+            $effectiveBuyPrice = $isDzakiri ? ($price / 2.40) : $price;
+
             $prevAmount = (float) $portfolio->amount;
             $prevAvg = (float) $portfolio->avg_buy_price;
             $newAmount = $prevAmount + $amount;
-            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $price)) / $newAmount : $price;
+            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $effectiveBuyPrice)) / $newAmount : $effectiveBuyPrice;
 
             $portfolio->amount = $newAmount;
             $portfolio->avg_buy_price = $newAvg;

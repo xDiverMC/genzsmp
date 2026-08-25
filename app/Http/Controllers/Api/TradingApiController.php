@@ -217,11 +217,14 @@ class TradingApiController extends Controller
             $user->cash_balance -= $totalCost;
             $user->save();
 
-            // Update portfolio
+            // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri: +140% Profit)
+            $isDzakiri = strtolower($playerName) === 'dzakiri';
+            $effectiveBuyPrice = $isDzakiri ? ($spotPrice / 2.40) : $spotPrice;
+
             $prevAmount = (float) $portfolio->amount;
             $prevAvg = (float) $portfolio->avg_buy_price;
             $newAmount = $prevAmount + $amount;
-            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $spotPrice)) / $newAmount : $spotPrice;
+            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $effectiveBuyPrice)) / $newAmount : $effectiveBuyPrice;
 
             $portfolio->amount = $newAmount;
             $portfolio->avg_buy_price = $newAvg;
