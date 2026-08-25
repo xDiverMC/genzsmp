@@ -350,7 +350,7 @@ class InvestMarketEngine
                     }
                     if (!$user) return;
 
-                    $taxRate = in_array($sym, ['BTC', 'ETH']) ? 0.08 : 0.05;
+                    $taxRate = 0.05;
                     $subtotal = $order->amount * $spotPrice;
                     $tax = $subtotal * $taxRate;
 

@@ -226,9 +226,9 @@ class TradingApiController extends Controller
         }
         Cache::put($cdKey, true, now()->addSeconds(5));
 
-        // 5. Calculate Financials
+        // 5. Calculate Financials (5% All Assets)
         $subtotal = $amount * $spotPrice;
-        $taxRate = in_array($assetSymbol, ['BTC', 'ETH']) ? 0.08 : 0.05;
+        $taxRate = 0.05;
         $tax = $subtotal * $taxRate;
 
         // Get Portfolio
@@ -400,7 +400,7 @@ class TradingApiController extends Controller
             return response()->json(['success' => false, 'message' => 'PIN Keamanan Trading salah.'], 401);
         }
 
-        $taxRate = in_array($assetSymbol, ['BTC', 'ETH']) ? 0.08 : 0.05;
+        $taxRate = 0.05;
         $subtotal = $amount * $targetPrice;
         $tax = $subtotal * $taxRate;
         $reservedCost = $subtotal + $tax;

@@ -203,7 +203,7 @@ class InvestSyncController extends Controller
         }
 
         $subtotal = $amount * $price;
-        $taxRate = in_array(strtoupper($asset), ['BTC', 'ETH']) ? 0.08 : 0.05;
+        $taxRate = 0.05;
         $tax = $subtotal * $taxRate;
         $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
 
