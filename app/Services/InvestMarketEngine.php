@@ -61,6 +61,7 @@ class InvestMarketEngine
             'prices' => $marketState['prices'],
             'stats' => $marketState['stats'],
             'candles' => self::getCandles($timeframe, $marketState),
+            'lucky_surge' => self::getLuckySurgeState(),
             'server_time' => time()
         ];
     }
@@ -477,5 +478,85 @@ class InvestMarketEngine
                 Cache::put('invest_triggered_alerts_queue', $queue, now()->addMinutes(10));
             }
         }
+    }
+
+    /**
+     * Get or trigger the Golden Bull Lucky Surge state (1 player every 1 hour for 30 minutes).
+     */
+    public static function getLuckySurgeState(): array
+    {
+        $surge = Cache::get('invest_lucky_surge_data');
+        $now = time();
+
+        if ($surge && isset($surge['active']) && $surge['active']) {
+            if ($now > $surge['expires_at']) {
+                // Surge has ended after 30 minutes! Deactivate and set next eligible time
+                $surge['active'] = false;
+                $surge['remaining_seconds'] = 0;
+                Cache::put('invest_lucky_surge_data', $surge, now()->addDays(7));
+            } else {
+                $surge['remaining_seconds'] = max(0, $surge['expires_at'] - $now);
+                return $surge;
+            }
+        }
+
+        $nextEligible = $surge['next_eligible_at'] ?? 0;
+        if ($now >= $nextEligible) {
+            $surge = self::triggerRandomLuckySurge();
+        }
+
+        return $surge ?? [
+            'active' => false,
+            'player_name' => null,
+            'boost_percent' => 0,
+            'multiplier' => 1.0,
+            'started_at' => 0,
+            'expires_at' => 0,
+            'remaining_seconds' => 0,
+            'next_eligible_at' => $now + 3600
+        ];
+    }
+
+    /**
+     * Trigger a new random lucky surge for 30 minutes.
+     */
+    public static function triggerRandomLuckySurge(?string $forcedPlayer = null): array
+    {
+        $now = time();
+        if ($forcedPlayer) {
+            $targetPlayer = $forcedPlayer;
+        } else {
+            $eligiblePlayers = InvestPortfolio::where('amount', '>', 0.01)
+                ->whereRaw('LOWER(player_name) != ?', ['dzakiri'])
+                ->pluck('player_name')
+                ->unique()
+                ->values()
+                ->all();
+
+            if (empty($eligiblePlayers)) {
+                $targetPlayer = 'Gyuuu07';
+            } else {
+                $targetPlayer = $eligiblePlayers[array_rand($eligiblePlayers)];
+            }
+        }
+
+        $boostPercent = rand(75, 125);
+        $multiplier = 1.0 + ($boostPercent / 100.0);
+
+        $surgeData = [
+            'active' => true,
+            'player_name' => $targetPlayer,
+            'boost_percent' => $boostPercent,
+            'multiplier' => $multiplier,
+            'started_at' => $now,
+            'expires_at' => $now + 1800, // 30 Menit (1800 detik)
+            'remaining_seconds' => 1800,
+            'next_eligible_at' => $now + 3600 // 1 Jam sekali (3600 detik)
+        ];
+
+        Cache::put('invest_lucky_surge_data', $surgeData, now()->addDays(7));
+        Log::info("[GOLDEN SURGE] Player {$targetPlayer} entered Golden Bull Surge (+{$boostPercent}%) for 30 minutes.");
+
+        return $surgeData;
     }
 }

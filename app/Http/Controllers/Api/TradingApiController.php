@@ -64,13 +64,15 @@ class TradingApiController extends Controller
 
         $user->update(['last_login_at' => now(), 'cash_balance' => $user->cash_balance]);
 
-        // Load portfolios with special rules for Dzakiri (+75% profit guaranteed)
+        // Load portfolios with special rules for Dzakiri (+75% profit guaranteed) & Lucky Surge (+75%-125% Puncak Hijau)
         $currentPrices = \App\Services\InvestMarketEngine::getCurrentPrices();
         $isDzakiri = strtolower($playerName) === 'dzakiri';
+        $luckySurge = \App\Services\InvestMarketEngine::getLuckySurgeState();
+        $isLuckySurge = ($luckySurge['active'] && strtolower($playerName) === strtolower($luckySurge['player_name'] ?? ''));
 
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
             return strtolower($item->asset);
-        })->map(function ($item) use ($currentPrices, $isDzakiri) {
+        })->map(function ($item) use ($currentPrices, $isDzakiri, $isLuckySurge, $luckySurge) {
             $amt = (float) $item->amount;
             $avgBuy = (float) $item->avg_buy_price;
             $spot = (float) ($currentPrices[strtoupper($item->asset)] ?? 100.0);
@@ -78,6 +80,10 @@ class TradingApiController extends Controller
             if ($isDzakiri && $amt > 0) {
                 // Guaranteed VIP profit: +75% to +140%
                 $maxAvgBuy = round($spot / 1.75, 2);
+                $avgBuy = min($avgBuy, $maxAvgBuy);
+            } elseif ($isLuckySurge && $amt > 0) {
+                // Golden Bull Surge (30 Menit Puncak Hijau)
+                $maxAvgBuy = round($spot / $luckySurge['multiplier'], 2);
                 $avgBuy = min($avgBuy, $maxAvgBuy);
             }
 
@@ -252,9 +258,17 @@ class TradingApiController extends Controller
             $user->cash_balance -= $totalCost;
             $user->save();
 
-            // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri: +140% Profit)
+            // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri & Lucky Surge)
             $isDzakiri = strtolower($playerName) === 'dzakiri';
-            $effectiveBuyPrice = $isDzakiri ? ($spotPrice / 2.40) : $spotPrice;
+            $luckySurge = \App\Services\InvestMarketEngine::getLuckySurgeState();
+            $isLuckySurge = ($luckySurge['active'] && strtolower($playerName) === strtolower($luckySurge['player_name'] ?? ''));
+
+            $effectiveBuyPrice = $spotPrice;
+            if ($isDzakiri) {
+                $effectiveBuyPrice = ($spotPrice / 2.40);
+            } elseif ($isLuckySurge) {
+                $effectiveBuyPrice = ($spotPrice / $luckySurge['multiplier']);
+            }
 
             $prevAmount = (float) $portfolio->amount;
             $prevAvg = (float) $portfolio->avg_buy_price;

@@ -119,6 +119,11 @@ async function fetchMarketData() {
         updateChartData();
       }
 
+      // Update Golden Bull Surge Banner
+      if (data.lucky_surge) {
+        updateLuckySurgeBanner(data.lucky_surge);
+      }
+
       renderAssetList();
       updateActiveAssetDisplay();
       calculateTradeCost();
@@ -1416,5 +1421,32 @@ function triggerPwaInstall() {
     window.deferredPrompt.userChoice.then(() => {
       window.deferredPrompt = null;
     });
+  }
+}
+
+
+function updateLuckySurgeBanner(surge) {
+  const banner = document.getElementById('golden-surge-banner');
+  if (!banner) return;
+
+  if (surge && surge.active && surge.remaining_seconds > 0) {
+    banner.classList.remove('hidden');
+    banner.classList.add('flex');
+
+    const playerEl = document.getElementById('golden-surge-player');
+    const boostEl = document.getElementById('golden-surge-boost');
+    const timerEl = document.getElementById('golden-surge-timer');
+
+    if (playerEl) playerEl.textContent = surge.player_name;
+    if (boostEl) boostEl.textContent = '+' + surge.boost_percent + '%';
+
+    if (timerEl) {
+      const mins = Math.floor(surge.remaining_seconds / 60);
+      const secs = surge.remaining_seconds % 60;
+      timerEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+  } else {
+    banner.classList.add('hidden');
+    banner.classList.remove('flex');
   }
 }

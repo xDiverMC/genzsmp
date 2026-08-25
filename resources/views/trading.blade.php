@@ -241,6 +241,22 @@
         </div>
       </div>
 
+      <!-- GOLDEN BULL SURGE LIVE BANNER (Appears dynamically when active) -->
+      <div id="golden-surge-banner" class="hidden bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-emerald-500/20 border-b border-amber-500/30 px-4 py-2 text-xs font-mono flex items-center justify-between shadow-lg shadow-amber-500/10">
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-md bg-amber-500 text-black font-extrabold uppercase text-[10px] animate-pulse flex items-center gap-1">
+            <i data-lucide="zap" class="h-3 w-3"></i> GOLDEN BULL SURGE
+          </span>
+          <span class="text-neutral-200">
+            Puncak Hijau Aktif: <strong id="golden-surge-player" class="text-amber-300 font-bold">Player</strong> sedang mengalami lonjakan portofolio <strong id="golden-surge-boost" class="text-emerald-400 font-bold">+95%</strong>!
+          </span>
+        </div>
+        <div class="flex items-center gap-2 text-amber-400 font-bold">
+          <span>Sisa Waktu:</span>
+          <span id="golden-surge-timer" class="px-2 py-0.5 rounded bg-black/60 border border-amber-500/30 text-amber-300 font-mono">30:00</span>
+        </div>
+      </div>
+
       <!-- MAIN TRADING WORKSPACE -->
       <main class="flex-1 p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-[1600px] w-full mx-auto">
 

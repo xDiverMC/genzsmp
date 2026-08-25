@@ -145,7 +145,8 @@ class InvestSyncController extends Controller
             'timestamp' => time(),
             'prices' => $prices,
             'actions' => $pendingActions,
-            'alerts' => $triggeredAlerts
+            'alerts' => $triggeredAlerts,
+            'lucky_surge' => InvestMarketEngine::getLuckySurgeState()
         ]);
     }
 
