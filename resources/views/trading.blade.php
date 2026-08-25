@@ -141,7 +141,7 @@
             />
             <div class="flex flex-col">
               <span class="font-display text-xs sm:text-lg font-black tracking-wider uppercase text-white leading-tight">
-                {{ ['name'] }}<span class="text-primary">{{ ['suffix'] }}</span>
+                {{ $serverInfo['name'] ?? 'Genz' }}<span class="text-primary">{{ $serverInfo['suffix'] ?? 'SMP' }}</span>
               </span>
               <span class="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-primary/80">Trading Terminal Pro</span>
             </div>
@@ -892,7 +892,7 @@
 
       <!-- FOOTER -->
       <footer class="border-t border-neutral-900 py-6 px-4 text-center text-xs text-neutral-500 font-mono mt-auto">
-        <p>© 2026 {{ ['name'] }} {{ ['suffix'] }} Trading Terminal Pro. Zero-Trust Security &amp; Outbound HTTPS Sync Bridge.</p>
+        <p>© 2026 {{ $serverInfo['name'] ?? 'Genz' }} {{ $serverInfo['suffix'] ?? 'SMP' }} Trading Terminal Pro. Zero-Trust Security &amp; Outbound HTTPS Sync Bridge.</p>
       </footer>
 
     </div>
@@ -901,14 +901,14 @@
     <script>
       window.TRADING_CONFIG = {
         csrfToken: '{{ csrf_token() }}',
-        serverName: '{{ ['name'] }}',
-        initialPrices: @json( ?? [
+        serverName: '{{ $serverInfo["name"] ?? "GenzSMP" }}',
+        initialPrices: {!! json_encode($prices ?? [
             'BTC' => 1020.00,
             'ETH' => 510.00,
             'GLD' => 105.00,
             'DIA' => 245.00,
             'EMD' => 175.00,
-        ]),
+        ]) !!},
       };
     </script>
 

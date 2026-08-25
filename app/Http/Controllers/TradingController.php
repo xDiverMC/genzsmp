@@ -28,6 +28,7 @@ class TradingController extends Controller
         $serverInfo = config('minecraft.server');
         $tradingConfig = config('minecraft.trading');
         $serverStatus = $this->serverService->getStatus();
+        $prices = \App\Services\InvestMarketEngine::getCurrentPrices();
 
         return view('trading', [
             'token' => $token,
@@ -36,7 +37,8 @@ class TradingController extends Controller
             'serverInfo' => $serverInfo,
             'tradingConfig' => $tradingConfig,
             'serverStatus' => $serverStatus,
-            'assets' => $tradingConfig['assets'],
+            'assets' => $tradingConfig['assets'] ?? [],
+            'prices' => $prices,
         ]);
     }
 }
