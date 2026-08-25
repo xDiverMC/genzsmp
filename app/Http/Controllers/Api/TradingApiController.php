@@ -409,15 +409,15 @@ class TradingApiController extends Controller
             'BTC' => 1020.00,
             'ETH' => 510.00,
             'GLD' => 105.00,
-            'DIA' => 65.00,
-            'EMD' => 35.00
+            'DIA' => 245.00,
+            'EMD' => 175.00
         ];
 
         $users = InvestUser::with('portfolios')->get();
-        $totalInvestors = $users->count();
-        $totalMarketCap = 0.0;
+        $totalAssetMarketCap = 0.0;
+        $activeInvestorsCount = 0;
 
-        $leaderboard = $users->map(function ($u) use ($prices, &$totalMarketCap) {
+        $leaderboard = $users->map(function ($u) use ($prices, &$totalAssetMarketCap, &$activeInvestorsCount) {
             $assetsValue = 0.0;
             $holdings = [];
 
@@ -434,24 +434,28 @@ class TradingApiController extends Controller
 
             $cash = (float) $u->cash_balance;
             $netWorth = $cash + $assetsValue;
-            $totalMarketCap += $netWorth;
+            $totalAssetMarketCap += $assetsValue;
 
-            // Tier Badge
-            if ($netWorth >= 100000) {
+            $tradeCount = InvestTrade::where('player_name', $u->player_name)->count();
+
+            if ($assetsValue > 0 || $tradeCount > 0) {
+                $activeInvestorsCount++;
+            }
+
+            // Tier Badge based on Asset Holdings & Investment Scale
+            if ($assetsValue >= 1000000 || $netWorth >= 5000000) {
                 $badge = 'WHALE 🐋';
                 $badgeColor = 'purple';
-            } elseif ($netWorth >= 50000) {
+            } elseif ($assetsValue >= 200000 || $netWorth >= 1000000) {
                 $badge = 'SHARK 🦈';
                 $badgeColor = 'cyan';
-            } elseif ($netWorth >= 20000) {
+            } elseif ($assetsValue >= 50000 || $netWorth >= 200000) {
                 $badge = 'DOLPHIN 🐬';
                 $badgeColor = 'emerald';
             } else {
                 $badge = 'FISH 🐟';
                 $badgeColor = 'neutral';
             }
-
-            $tradeCount = InvestTrade::where('player_name', $u->player_name)->count();
 
             return [
                 'player_name' => $u->player_name,
@@ -465,7 +469,20 @@ class TradingApiController extends Controller
                 'total_trades' => $tradeCount,
                 'avatar_url' => 'https://mc-heads.net/avatar/' . urlencode(ltrim($u->player_name, '.')) . '/64'
             ];
-        })->sortByDesc('total_net_worth')->values();
+        })
+        ->filter(function ($item) {
+            return $item['assets_value'] > 0 || $item['total_trades'] > 0;
+        })
+        ->sort(function ($a, $b) {
+            if ($b['assets_value'] !== $a['assets_value']) {
+                return $b['assets_value'] <=> $a['assets_value'];
+            }
+            if ($b['total_trades'] !== $a['total_trades']) {
+                return $b['total_trades'] <=> $a['total_trades'];
+            }
+            return $b['total_net_worth'] <=> $a['total_net_worth'];
+        })
+        ->values();
 
         // Assign ranking positions
         $topList = $leaderboard->take(10)->map(function ($item, $index) {
@@ -476,8 +493,8 @@ class TradingApiController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'total_investors' => $totalInvestors,
-                'total_market_cap' => $totalMarketCap,
+                'total_investors' => $activeInvestorsCount > 0 ? $activeInvestorsCount : $users->count(),
+                'total_market_cap' => $totalAssetMarketCap,
                 'top_investors' => $topList
             ]
         ]);

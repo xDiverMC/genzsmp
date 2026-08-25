@@ -49,36 +49,52 @@ class InvestSyncController extends Controller
             InvestAction::whereIn('id', $completedIds)->update(['status' => 'COMPLETED']);
         }
 
-        // 2. Update real in-game Vault cash balance for online players
+        // 2. Update real in-game Vault cash balance for online players in a single transaction
         $players = $request->input('players', []);
         $onlineNames = [];
 
-        if (is_array($players)) {
+        if (is_array($players) && !empty($players)) {
+            $namesMap = [];
             foreach ($players as $pData) {
                 $name = trim($pData['name'] ?? '');
-                if (empty($name)) continue;
-
-                $onlineNames[] = $name;
-                $balance = (float) ($pData['balance'] ?? 0);
-                $uuid = $pData['uuid'] ?? null;
-                $isBedrock = (bool) ($pData['is_bedrock'] ?? str_starts_with($name, '.'));
-
-                $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($name)])->first();
-                if (!$user) {
-                    $user = InvestUser::create([
-                        'player_name' => $name,
-                        'uuid' => $uuid,
-                        'is_bedrock' => $isBedrock,
-                        'cash_balance' => $balance,
-                        'last_login_at' => now()
-                    ]);
-                } else {
-                    $user->cash_balance = $balance;
-                    if ($uuid) $user->uuid = $uuid;
-                    $user->is_bedrock = $isBedrock;
-                    $user->last_login_at = now();
-                    $user->save();
+                if (!empty($name)) {
+                    $namesMap[strtolower($name)] = $pData;
+                    $onlineNames[] = $name;
                 }
+            }
+
+            if (!empty($namesMap)) {
+                \Illuminate\Support\Facades\DB::transaction(function () use ($namesMap) {
+                    $existingUsers = InvestUser::whereIn('player_name', array_column($namesMap, 'name'))
+                        ->get()
+                        ->keyBy(fn($u) => strtolower($u->player_name));
+
+                    foreach ($namesMap as $lowerName => $pData) {
+                        $name = $pData['name'];
+                        $balance = (float) ($pData['balance'] ?? 0);
+                        $uuid = $pData['uuid'] ?? null;
+                        $isBedrock = (bool) ($pData['is_bedrock'] ?? str_starts_with($name, '.'));
+
+                        if (isset($existingUsers[$lowerName])) {
+                            $user = $existingUsers[$lowerName];
+                            if (abs($user->cash_balance - $balance) > 0.001 || ($uuid && $user->uuid !== $uuid)) {
+                                $user->cash_balance = $balance;
+                                if ($uuid) $user->uuid = $uuid;
+                                $user->is_bedrock = $isBedrock;
+                                $user->last_login_at = now();
+                                $user->save();
+                            }
+                        } else {
+                            InvestUser::create([
+                                'player_name' => $name,
+                                'uuid' => $uuid,
+                                'is_bedrock' => $isBedrock,
+                                'cash_balance' => $balance,
+                                'last_login_at' => now()
+                            ]);
+                        }
+                    }
+                });
             }
         }
 
@@ -86,11 +102,7 @@ class InvestSyncController extends Controller
         $pendingActions = [];
         if (!empty($onlineNames)) {
             $actions = InvestAction::where('status', 'PENDING')
-                ->where(function ($query) use ($onlineNames) {
-                    foreach ($onlineNames as $name) {
-                        $query->orWhereRaw('LOWER(player_name) = ?', [strtolower($name)]);
-                    }
-                })
+                ->whereIn('player_name', $onlineNames)
                 ->limit(20)
                 ->get();
 

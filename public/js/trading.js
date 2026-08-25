@@ -1060,13 +1060,13 @@ async function loadLeaderboard() {
 
               <div>
                 <h4 class="font-bold text-white text-sm truncate max-w-[140px]">${inv.player_name}</h4>
-                <p class="text-[10px] text-neutral-400">Total Net Worth</p>
-                <p class="font-mono font-black text-sm text-emerald-400">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p class="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Total Aset Investasi</p>
+                <p class="font-mono font-black text-sm text-purple-300">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
 
               <div class="w-full pt-2 border-t border-neutral-800/80 grid grid-cols-2 text-[10px] font-mono text-neutral-400">
                 <div>Kas: <strong class="text-white">$${(inv.cash_balance / 1000).toFixed(1)}k</strong></div>
-                <div>Aset: <strong class="text-white">$${(inv.assets_value / 1000).toFixed(1)}k</strong></div>
+                <div>Trades: <strong class="text-white">${inv.total_trades}x</strong></div>
               </div>
             </div>
           `;
@@ -1098,8 +1098,8 @@ async function loadLeaderboard() {
               <td class="py-2.5 px-3">
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-neutral-900 border border-neutral-800 text-neutral-300">${inv.badge}</span>
               </td>
+              <td class="py-2.5 px-3 text-purple-400 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               <td class="py-2.5 px-3 text-neutral-300">$${inv.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td class="py-2.5 px-3 text-purple-300 font-bold">$${inv.assets_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">$${inv.total_net_worth.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
             </tr>
           `).join('');

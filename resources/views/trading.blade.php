@@ -455,8 +455,8 @@
                       <th class="py-2.5 px-3">Rank</th>
                       <th class="py-2.5 px-3">Player Gamertag</th>
                       <th class="py-2.5 px-3">Badge Tier</th>
+                      <th class="py-2.5 px-3 text-purple-400 font-bold">Total Aset Investasi</th>
                       <th class="py-2.5 px-3">Kas Vault</th>
-                      <th class="py-2.5 px-3">Nilai Portofolio Aset</th>
                       <th class="py-2.5 px-3 text-right">Total Net Worth</th>
                     </tr>
                   </thead>
