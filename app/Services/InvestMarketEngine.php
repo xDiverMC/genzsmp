@@ -104,23 +104,53 @@ class InvestMarketEngine
     }
 
     /**
-     * Tick market prices with 75% Bullish Momentum Engine & auto-fill limit orders / alerts.
+     * Tick market prices with realistic dynamic market waves & auto-fill limit orders / alerts.
      */
     protected static function tickMarket(array $state): array
     {
         $state['last_tick'] = microtime(true);
         $currentTime = time();
 
+        if (!isset($state['trend'])) {
+            $state['trend'] = [];
+        }
+
         foreach ($state['prices'] as $sym => $currentPrice) {
             $base = self::BASE_PRICES[$sym];
 
-            // 75% Bullish Bias Momentum Engine
-            $isBull = (mt_rand(1, 100) <= 75);
-            $factor = $isBull ? (mt_rand(20, 60) / 10000.0) : -(mt_rand(10, 30) / 10000.0);
+            // Initialize or switch momentum trend for this asset (15-35 ticks per mini-cycle)
+            if (!isset($state['trend'][$sym]) || ($state['trend'][$sym]['ticks_left'] ?? 0) <= 0) {
+                // Determine new trend: 45% Bull, 45% Bear, 10% Sideways
+                $rnd = mt_rand(1, 100);
+                $dir = ($rnd <= 45) ? 1 : (($rnd <= 90) ? -1 : 0);
+                $state['trend'][$sym] = [
+                    'direction' => $dir,
+                    'ticks_left' => mt_rand(15, 35),
+                    'volatility' => mt_rand(15, 45) / 10000.0, // 0.15% to 0.45% per tick
+                ];
+            }
 
+            $trend = &$state['trend'][$sym];
+            $trend['ticks_left']--;
+
+            // Micro-tick noise + Trend impulse + Mean Reversion pull around baseline
+            $noise = (mt_rand(-20, 20) / 10000.0);
+            $trendStep = $trend['direction'] * $trend['volatility'];
+
+            // Mean reversion: if price gets too high above baseline, pull down; if too low, pull up
+            $ratio = $currentPrice / $base;
+            $meanRevertPull = 0.0;
+            if ($ratio > 1.15) {
+                $meanRevertPull = -0.0018; // Pull down from peak
+            } elseif ($ratio < 0.85) {
+                $meanRevertPull = 0.0018;  // Pull up from bottom
+            }
+
+            $factor = $trendStep + $noise + $meanRevertPull;
             $newPrice = round($currentPrice * (1.0 + $factor), 2);
-            // Boundary safety: 0.85x to 1.35x base
-            $newPrice = max($base * 0.85, min($base * 1.35, $newPrice));
+
+            // Boundary safety: 0.70x to 1.30x of base price
+            $newPrice = max($base * 0.70, min($base * 1.30, $newPrice));
 
             $state['prices'][$sym] = $newPrice;
 

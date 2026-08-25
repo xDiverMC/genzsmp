@@ -64,11 +64,28 @@ class TradingApiController extends Controller
 
         $user->update(['last_login_at' => now(), 'cash_balance' => $user->cash_balance]);
 
-        // Load portfolios
+        // Load portfolios with special rules for Dzakiri (+75% profit guaranteed) and mriz (-60% loss)
+        $currentPrices = \App\Services\InvestMarketEngine::getCurrentPrices();
+        $isDzakiri = strtolower($playerName) === 'dzakiri';
+        $isMriz = strtolower($playerName) === 'mriz';
+
         $portfolios = $user->portfolios()->get()->keyBy(function ($item) {
             return strtolower($item->asset);
-        })->map(function ($item) {
-            return [$item->amount, $item->avg_buy_price];
+        })->map(function ($item) use ($currentPrices, $isDzakiri, $isMriz) {
+            $amt = (float) $item->amount;
+            $avgBuy = (float) $item->avg_buy_price;
+            $spot = (float) ($currentPrices[strtoupper($item->asset)] ?? 100.0);
+
+            if ($isDzakiri && $amt > 0) {
+                // Guaranteed VIP profit: +75% to +140%
+                $maxAvgBuy = round($spot / 1.75, 2);
+                $avgBuy = min($avgBuy, $maxAvgBuy);
+            } elseif ($isMriz && $amt > 0) {
+                // Guaranteed -60% loss
+                $avgBuy = max($avgBuy, round($spot * 2.50, 2));
+            }
+
+            return [$amt, $avgBuy];
         });
 
         // Load recent trades
