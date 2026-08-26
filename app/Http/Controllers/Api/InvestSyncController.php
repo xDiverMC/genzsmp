@@ -194,8 +194,9 @@ class InvestSyncController extends Controller
         $amount = (float) $request->input('amount');
         $price = (float) $request->input('price');
 
-        if (empty($playerName) || !in_array($tradeType, ['BUY', 'SELL']) || $amount <= 0 || $price <= 0) {
-            return response()->json(['success' => false, 'message' => 'Invalid trade parameters'], 400);
+        $validAssets = ['BTC', 'ETH', 'GLD', 'DIA', 'EMD'];
+        if (empty($playerName) || !in_array($tradeType, ['BUY', 'SELL']) || !in_array($asset, $validAssets) || $amount <= 0 || $price <= 0) {
+            return response()->json(['success' => false, 'message' => "Parameter trade tidak valid atau aset '{$asset}' tidak terdaftar di bursa."], 400);
         }
 
         $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
@@ -203,15 +204,32 @@ class InvestSyncController extends Controller
             $user = InvestUser::findOrCreateByName($playerName);
         }
 
-        $subtotal = $amount * $price;
-        $taxRate = 0.08;
-        $tax = $subtotal * $taxRate;
-        $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
-
         $portfolio = InvestPortfolio::firstOrCreate(
             ['invest_user_id' => $user->id, 'asset' => $asset],
             ['player_name' => $user->player_name, 'amount' => 0, 'avg_buy_price' => 0]
         );
+
+        if ($tradeType === 'SELL') {
+            $currentOwned = (float) $portfolio->amount;
+            if ($currentOwned < $amount) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Aset {$asset} Anda tidak mencukupi! Anda hanya memiliki " . number_format($currentOwned, 2) . " {$asset}."
+                ], 400);
+            }
+
+            $portfolio->amount = max(0, $currentOwned - $amount);
+            if ($portfolio->amount <= 0.0001) {
+                $portfolio->amount = 0;
+                $portfolio->avg_buy_price = 0;
+            }
+            $portfolio->save();
+        }
+
+        $subtotal = $amount * $price;
+        $taxRate = 0.08;
+        $tax = $subtotal * $taxRate;
+        $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
 
         if ($tradeType === 'BUY') {
             $isDzakiri = strtolower($playerName) === 'dzakiri';
@@ -224,13 +242,6 @@ class InvestSyncController extends Controller
 
             $portfolio->amount = $newAmount;
             $portfolio->avg_buy_price = $newAvg;
-            $portfolio->save();
-        } else {
-            $portfolio->amount = max(0, (float) $portfolio->amount - $amount);
-            if ($portfolio->amount <= 0.0001) {
-                $portfolio->amount = 0;
-                $portfolio->avg_buy_price = 0;
-            }
             $portfolio->save();
         }
 
