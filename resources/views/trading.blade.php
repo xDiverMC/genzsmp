@@ -236,7 +236,7 @@
             <span class="mx-6"><strong class="text-purple-400">[LIMIT ORDER]</strong> Fitur Limit Order Aktif: Pasang target beli/jual otomatis saat harga tercapai</span>
             <span class="mx-6"><strong class="text-cyan-400">[P2P TRANSFER]</strong> Transfer Aset Antar Pemain kini dapat dilakukan di web &amp; in-game (/invest transfer)</span>
             <span class="mx-6"><strong class="text-amber-400">[PRICE ALERT]</strong> In-Game Alerts: Notifikasi suara &amp; title in-game saat koin mencapai harga target (/invest alert)</span>
-            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> Pajak protokol: 5% untuk semua aset (BTC, ETH, GLD, DIA, EMD) otomatis diterapkan pada transaksi</span>
+            <span class="mx-6"><strong class="text-orange-400">[PROTOCOL]</strong> Pajak protokol: 8% untuk semua aset (BTC, ETH, GLD, DIA, EMD) otomatis diterapkan pada transaksi</span>
           </div>
         </div>
       </div>

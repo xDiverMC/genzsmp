@@ -351,7 +351,7 @@ class InvestMarketEngine
                     }
                     if (!$user) return;
 
-                    $taxRate = 0.05;
+                    $taxRate = 0.08;
                     $subtotal = $order->amount * $spotPrice;
                     $tax = $subtotal * $taxRate;
 

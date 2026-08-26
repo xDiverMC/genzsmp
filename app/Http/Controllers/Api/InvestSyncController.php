@@ -204,7 +204,7 @@ class InvestSyncController extends Controller
         }
 
         $subtotal = $amount * $price;
-        $taxRate = 0.05;
+        $taxRate = 0.08;
         $tax = $subtotal * $taxRate;
         $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
 
