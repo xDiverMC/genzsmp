@@ -106,8 +106,8 @@ class InvestSyncController extends Controller
         $pendingActions = [];
         if (!empty($onlineNames)) {
             $actions = InvestAction::where('status', 'PENDING')
-                ->whereIn('player_name', $onlineNames)
-                ->limit(20)
+                ->whereIn(DB::raw('LOWER(player_name)'), array_map('strtolower', $onlineNames))
+                ->limit(30)
                 ->get();
 
             $pendingActions = $actions->map(function ($act) {
