@@ -400,11 +400,6 @@ class InvestMarketEngine
                         // LIMIT SELL
                         $netPayout = $subtotal - $tax;
 
-                        // Target mriz loss setting
-                        if (strtolower($user->player_name) === 'mriz') {
-                            $netPayout = $netPayout * 0.40; // 60% loss penalty
-                        }
-
                         $user->cash_balance += $netPayout;
                         $user->save();
 

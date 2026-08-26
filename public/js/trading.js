@@ -688,10 +688,10 @@ function setPercentageAmount(pct) {
       ? parseFloat(targetPriceInput.value) : asset.price;
 
     const maxUnits = (cash * pct) / (unitPrice * taxMultiplier);
-    amountInput.value = Math.min(1000, Math.max(0, Math.floor(maxUnits * 100) / 100)).toFixed(2);
+    amountInput.value = Math.min(1000000, Math.max(0, Math.floor(maxUnits * 100) / 100)).toFixed(2);
   } else {
     const owned = state.portfolio[state.activeAsset] ? state.portfolio[state.activeAsset].amount : 0;
-    amountInput.value = (owned * pct).toFixed(2);
+    amountInput.value = Math.min(1000000, owned * pct).toFixed(2);
   }
 
   calculateTradeCost();

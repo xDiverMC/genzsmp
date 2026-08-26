@@ -142,7 +142,7 @@ class TradingApiController extends Controller
             'pin' => 'required|string|digits:6',
             'trade_type' => 'required|in:BUY,SELL',
             'asset' => 'required|string',
-            'amount' => 'required|numeric|min:0.01|max:1000',
+            'amount' => 'required|numeric|min:0.01|max:1000000',
             'price' => 'nullable|numeric|min:0.01',
         ]);
 
@@ -164,7 +164,7 @@ class TradingApiController extends Controller
         $currentPrices = InvestMarketEngine::getCurrentPrices();
         $spotPrice = (float) ($currentPrices[$assetSymbol] ?? $request->input('price', 100.0));
 
-        $user = InvestUser::where('player_name', $playerName)->first();
+        $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
         if (!$user) {
             return response()->json([
                 'success' => false,
@@ -386,7 +386,7 @@ class TradingApiController extends Controller
             'pin' => 'required|string|digits:6',
             'order_type' => 'required|in:BUY,SELL',
             'asset' => 'required|string',
-            'amount' => 'required|numeric|min:0.01|max:1000',
+            'amount' => 'required|numeric|min:0.01|max:1000000',
             'target_price' => 'required|numeric|min:0.01',
         ]);
 
@@ -405,7 +405,7 @@ class TradingApiController extends Controller
         $amount = (float) $request->input('amount');
         $targetPrice = (float) $request->input('target_price');
 
-        $user = InvestUser::where('player_name', $playerName)->first();
+        $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Akun tidak ditemukan.'], 404);
         }
@@ -512,7 +512,7 @@ class TradingApiController extends Controller
         $orderId = (int) $request->input('order_id');
 
         $order = InvestLimitOrder::where('id', $orderId)
-            ->where('player_name', $playerName)
+            ->whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])
             ->where('status', 'PENDING')
             ->first();
 
@@ -522,7 +522,7 @@ class TradingApiController extends Controller
 
         $user = InvestUser::find($order->invest_user_id);
         if (!$user) {
-            $user = InvestUser::where('player_name', $playerName)->first();
+            $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
         }
 
         DB::transaction(function () use ($order, $user) {
@@ -697,7 +697,7 @@ class TradingApiController extends Controller
         $asset = strtoupper(trim($request->input('asset')));
         $targetPrice = (float) $request->input('target_price');
 
-        $user = InvestUser::where('player_name', $playerName)->first();
+        $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Akun tidak ditemukan.'], 404);
         }
