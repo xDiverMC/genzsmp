@@ -476,7 +476,7 @@ class InvestMarketEngine
     }
 
     /**
-     * Get or trigger the Golden Bull Lucky Surge state (1 player every 1 hour for 30 minutes).
+     * Get or trigger the Golden Bull Lucky Surge state (1 player every 24 hours for 30 minutes).
      */
     public static function getLuckySurgeState(): array
     {
@@ -508,12 +508,12 @@ class InvestMarketEngine
             'started_at' => 0,
             'expires_at' => 0,
             'remaining_seconds' => 0,
-            'next_eligible_at' => $now + 3600
+            'next_eligible_at' => $now + 86400
         ];
     }
 
     /**
-     * Trigger a new random lucky surge for 30 minutes.
+     * Trigger a new random lucky surge for 30 minutes (24-hour cycle).
      */
     public static function triggerRandomLuckySurge(?string $forcedPlayer = null): array
     {
@@ -546,7 +546,7 @@ class InvestMarketEngine
             'started_at' => $now,
             'expires_at' => $now + 1800, // 30 Menit (1800 detik)
             'remaining_seconds' => 1800,
-            'next_eligible_at' => $now + 3600 // 1 Jam sekali (3600 detik)
+            'next_eligible_at' => $now + 86400 // 24 Jam sekali (86400 detik)
         ];
 
         Cache::put('invest_lucky_surge_data', $surgeData, now()->addDays(7));

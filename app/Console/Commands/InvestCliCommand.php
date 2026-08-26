@@ -104,8 +104,7 @@ class InvestCliCommand extends Command
     protected function showSurge(): void
     {
         $surge = InvestMarketEngine::getLuckySurgeState();
-        $this->line("
-[1;33m▶ ⚡ STATUS GOLDEN BULL SURGE ENGINE (1 JAM SEKALI, 30 MENIT)[0m");
+        $this->line("\n\033[1;33m▶ ⚡ STATUS GOLDEN BULL SURGE ENGINE (24 JAM SEKALI, 30 MENIT)\033[0m");
         $this->line(str_repeat("─", 78));
 
         if ($surge && !empty($surge['active'])) {
