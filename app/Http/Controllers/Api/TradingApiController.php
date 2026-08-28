@@ -174,6 +174,14 @@ class TradingApiController extends Controller
 
         // 1. Check if user has PIN set or set it on first trade
         if (!$user->hasPin()) {
+            $weakPins = ['123456', '654321', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123123', '112233', '121212'];
+            if (in_array($pin, $weakPins)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PIN terlalu mudah ditebak! Harap gunakan kombinasi 6 angka yang lebih unik dan aman.'
+                ], 400);
+            }
+
             if (preg_match('/^[0-9]{6}$/', $pin)) {
                 $user->setPin($pin);
             } else {

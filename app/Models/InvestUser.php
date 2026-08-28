@@ -80,7 +80,7 @@ class InvestUser extends Model
             ['player_name' => $cleanName],
             [
                 'is_bedrock' => $isBedrock,
-                'cash_balance' => 10000.00, // Initial default balance
+                'cash_balance' => 0.00, // Initial balance 0.00 (syncs from Minecraft Vault)
                 'last_login_at' => now(),
             ]
         );
