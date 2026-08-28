@@ -49,7 +49,19 @@ class TradingApiController extends Controller
         $user = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($playerName)])->first();
 
         if (!$user) {
-            $user = InvestUser::findOrCreateByName($playerName);
+            return response()->json([
+                'success' => false,
+                'error_code' => 'USER_NOT_FOUND',
+                'message' => "Akun pemain '{$playerName}' tidak ditemukan di server! Harap masuk ke server Minecraft terlebih dahulu."
+            ], 404);
+        }
+
+        if (!$user->hasPin()) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'PIN_NOT_SET_INGAME',
+                'message' => "Akun '{$playerName}' belum memiliki PIN Keamanan! Silakan masuk ke game Minecraft dan ketik /invest setpin <6-digit-pin> terlebih dahulu."
+            ], 403);
         }
 
         // Try live Vault balance sync via RCON if reachable
@@ -172,25 +184,13 @@ class TradingApiController extends Controller
             ], 404);
         }
 
-        // 1. Check if user has PIN set or set it on first trade
+        // 1. Strictly verify user has PIN set in-game
         if (!$user->hasPin()) {
-            $weakPins = ['123456', '654321', '000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123123', '112233', '121212'];
-            if (in_array($pin, $weakPins)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'PIN terlalu mudah ditebak! Harap gunakan kombinasi 6 angka yang lebih unik dan aman.'
-                ], 400);
-            }
-
-            if (preg_match('/^[0-9]{6}$/', $pin)) {
-                $user->setPin($pin);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'error_code' => 'PIN_NOT_SET',
-                    'message' => 'Akun Anda belum memiliki PIN Keamanan Trading! Masukkan 6 angka numerik untuk menetapkan PIN Anda.'
-                ], 403);
-            }
+            return response()->json([
+                'success' => false,
+                'error_code' => 'PIN_NOT_SET_INGAME',
+                'message' => 'Akun Anda belum memiliki PIN Keamanan Trading! Harap buat PIN terlebih dahulu di dalam game Minecraft dengan mengetik: /invest setpin <6-digit-pin>'
+            ], 403);
         }
 
         // 2. Anti-Brute-Force PIN Lockout Check (Max 5 attempts -> 15 min lock)
@@ -418,6 +418,14 @@ class TradingApiController extends Controller
             return response()->json(['success' => false, 'message' => 'Akun tidak ditemukan.'], 404);
         }
 
+        if (!$user->hasPin()) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'PIN_NOT_SET_INGAME',
+                'message' => 'Akun Anda belum memiliki PIN Keamanan Trading! Harap atur PIN di dalam game Minecraft dengan mengetik: /invest setpin <6-digit-pin>'
+            ], 403);
+        }
+
         if (!$user->verifyPin($pin)) {
             return response()->json(['success' => false, 'message' => 'PIN Keamanan Trading salah.'], 401);
         }
@@ -598,7 +606,11 @@ class TradingApiController extends Controller
         }
 
         $sender = InvestUser::where('player_name', $senderName)->first();
-        if (!$sender || !$sender->verifyPin($pin)) {
+        if (!$sender || !$sender->hasPin()) {
+            return response()->json(['success' => false, 'message' => 'Akun pengirim belum memiliki PIN Keamanan! Harap atur PIN di in-game terlebih dahulu (/invest setpin <pin>).'], 403);
+        }
+
+        if (!$sender->verifyPin($pin)) {
             return response()->json(['success' => false, 'message' => 'PIN Keamanan Trading pengirim salah.'], 401);
         }
 
@@ -610,7 +622,7 @@ class TradingApiController extends Controller
 
         $receiver = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($receiverName)])->first();
         if (!$receiver) {
-            $receiver = InvestUser::findOrCreateByName($receiverName);
+            return response()->json(['success' => false, 'message' => "Pemain penerima '{$receiverName}' tidak ditemukan di server Minecraft!"], 404);
         }
 
         $feeRate = 0.02; // 2% protocol transfer tax
