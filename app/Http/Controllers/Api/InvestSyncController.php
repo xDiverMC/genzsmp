@@ -75,7 +75,8 @@ class InvestSyncController extends Controller
 
                     foreach ($namesMap as $lowerName => $pData) {
                         $name = $pData['name'];
-                        $balance = (float) ($pData['balance'] ?? 0);
+                        $rawBalance = (float) ($pData['balance'] ?? 0);
+                        $balance = max(0, min(is_finite($rawBalance) ? $rawBalance : 0, 1000000000.0));
                         $uuid = $pData['uuid'] ?? null;
                         $isBedrock = (bool) ($pData['is_bedrock'] ?? str_starts_with($name, '.'));
 
@@ -89,13 +90,13 @@ class InvestSyncController extends Controller
                                 $user->save();
                             }
                         } else {
-                            InvestUser::create([
-                                'player_name' => $name,
-                                'uuid' => $uuid,
-                                'is_bedrock' => $isBedrock,
-                                'cash_balance' => $balance,
-                                'last_login_at' => now()
-                            ]);
+                            $newUser = new InvestUser();
+                            $newUser->player_name = $name;
+                            $newUser->uuid = $uuid;
+                            $newUser->is_bedrock = $isBedrock;
+                            $newUser->cash_balance = $balance;
+                            $newUser->last_login_at = now();
+                            $newUser->save();
                         }
                     }
                 });
@@ -280,6 +281,15 @@ class InvestSyncController extends Controller
         $receiverName = trim($request->input('receiver'));
         $asset = strtoupper(trim($request->input('asset')));
         $amount = (float) $request->input('amount');
+        $authenticatedPlayer = trim($request->input('authenticated_player', $senderName));
+
+        // SECURITY: Verify the authenticated player matches the sender (IDOR Prevention)
+        if (strtolower($authenticatedPlayer) !== strtolower($senderName)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak dapat mentransfer dari akun orang lain!'
+            ], 403);
+        }
 
         if (strtolower($senderName) === strtolower($receiverName)) {
             return response()->json(['success' => false, 'message' => 'Anda tidak dapat mentransfer aset ke akun Anda sendiri!'], 400);
@@ -294,15 +304,9 @@ class InvestSyncController extends Controller
             return response()->json(['success' => false, 'message' => 'Akun pengirim belum terdaftar di sistem investasi.'], 404);
         }
 
-        $senderPortfolio = InvestPortfolio::where('invest_user_id', $sender->id)->where('asset', $asset)->first();
-        if (!$senderPortfolio || $senderPortfolio->amount < $amount) {
-            $have = $senderPortfolio ? (float) $senderPortfolio->amount : 0;
-            return response()->json(['success' => false, 'message' => "Jumlah {$asset} tidak mencukupi! Anda hanya memiliki {$have} {$asset}."], 400);
-        }
-
         $receiver = InvestUser::whereRaw('LOWER(player_name) = ?', [strtolower($receiverName)])->first();
         if (!$receiver) {
-            $receiver = InvestUser::findOrCreateByName($receiverName);
+            return response()->json(['success' => false, 'message' => "Pemain penerima '{$receiverName}' tidak terdaftar di server Minecraft!"], 404);
         }
 
         // 2% Protocol Transfer Fee
@@ -312,62 +316,77 @@ class InvestSyncController extends Controller
 
         $spotPrice = InvestMarketEngine::getCurrentPrices()[$asset] ?? 100.0;
 
-        DB::transaction(function () use ($sender, $receiver, $senderPortfolio, $asset, $amount, $fee, $receivedAmount, $spotPrice) {
-            // Deduct from sender
-            $senderPortfolio->amount = max(0, $senderPortfolio->amount - $amount);
-            if ($senderPortfolio->amount <= 0.0001) {
-                $senderPortfolio->amount = 0;
-                $senderPortfolio->avg_buy_price = 0;
-            }
-            $senderPortfolio->save();
+        try {
+            DB::transaction(function () use ($sender, $receiver, $asset, $amount, $fee, $receivedAmount, $spotPrice) {
+                // Deduct from sender with pessimistic lock
+                $lockedSenderPort = InvestPortfolio::where('invest_user_id', $sender->id)
+                    ->where('asset', $asset)
+                    ->lockForUpdate()
+                    ->first();
 
-            // Add to receiver
-            $receiverPortfolio = InvestPortfolio::firstOrCreate(
-                ['invest_user_id' => $receiver->id, 'asset' => $asset],
-                ['player_name' => $receiver->player_name, 'amount' => 0, 'avg_buy_price' => 0]
-            );
+                if (!$lockedSenderPort || $lockedSenderPort->amount < $amount) {
+                    $have = $lockedSenderPort ? (float) $lockedSenderPort->amount : 0;
+                    throw new \Exception("Jumlah {$asset} tidak mencukupi! Anda hanya memiliki {$have} {$asset}.");
+                }
 
-            $prevAmount = (float) $receiverPortfolio->amount;
-            $prevAvg = (float) $receiverPortfolio->avg_buy_price;
-            $newAmount = $prevAmount + $receivedAmount;
-            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($receivedAmount * $spotPrice)) / $newAmount : $spotPrice;
+                $lockedSenderPort->amount = max(0, $lockedSenderPort->amount - $amount);
+                if ($lockedSenderPort->amount <= 0.0001) {
+                    $lockedSenderPort->amount = 0;
+                    $lockedSenderPort->avg_buy_price = 0;
+                }
+                $lockedSenderPort->save();
 
-            $receiverPortfolio->amount = $newAmount;
-            $receiverPortfolio->avg_buy_price = $newAvg;
-            $receiverPortfolio->save();
+                // Add to receiver with pessimistic lock
+                $lockedReceiverPort = InvestPortfolio::where('invest_user_id', $receiver->id)
+                    ->where('asset', $asset)
+                    ->lockForUpdate()
+                    ->first();
 
-            // Record transfer
-            InvestTransfer::create([
-                'sender_name' => $sender->player_name,
-                'receiver_name' => $receiver->player_name,
-                'asset' => $asset,
-                'amount' => $amount,
-                'fee' => $fee,
-                'received_amount' => $receivedAmount
-            ]);
+                if (!$lockedReceiverPort) {
+                    $lockedReceiverPort = InvestPortfolio::create([
+                        'invest_user_id' => $receiver->id,
+                        'player_name' => $receiver->player_name,
+                        'asset' => $asset,
+                        'amount' => 0,
+                        'avg_buy_price' => 0
+                    ]);
+                }
 
-            InvestTrade::create([
-                'player_name' => $sender->player_name,
-                'trade_type' => 'TRANSFER_OUT',
-                'asset' => $asset,
-                'amount' => $amount,
-                'price' => $spotPrice,
-                'subtotal' => $amount * $spotPrice,
-                'tax' => $fee * $spotPrice,
-                'total' => $amount * $spotPrice
-            ]);
+                $prevAmount = (float) $lockedReceiverPort->amount;
+                $prevAvg = (float) $lockedReceiverPort->avg_buy_price;
+                $newAmount = $prevAmount + $receivedAmount;
+                $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($receivedAmount * $spotPrice)) / $newAmount : $spotPrice;
 
-            InvestTrade::create([
-                'player_name' => $receiver->player_name,
-                'trade_type' => 'TRANSFER_IN',
-                'asset' => $asset,
-                'amount' => $receivedAmount,
-                'price' => $spotPrice,
-                'subtotal' => $receivedAmount * $spotPrice,
-                'tax' => 0,
-                'total' => $receivedAmount * $spotPrice
-            ]);
-        });
+                $lockedReceiverPort->amount = $newAmount;
+                $lockedReceiverPort->avg_buy_price = $newAvg;
+                $lockedReceiverPort->save();
+
+                // Record transfer
+                InvestTrade::create([
+                    'player_name' => $sender->player_name,
+                    'trade_type' => 'TRANSFER_OUT',
+                    'asset' => $asset,
+                    'amount' => $amount,
+                    'price' => $spotPrice,
+                    'subtotal' => $amount * $spotPrice,
+                    'tax' => $fee * $spotPrice,
+                    'total' => $amount * $spotPrice
+                ]);
+
+                InvestTrade::create([
+                    'player_name' => $receiver->player_name,
+                    'trade_type' => 'TRANSFER_IN',
+                    'asset' => $asset,
+                    'amount' => $receivedAmount,
+                    'price' => $spotPrice,
+                    'subtotal' => $receivedAmount * $spotPrice,
+                    'tax' => 0,
+                    'total' => $receivedAmount * $spotPrice
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
 
         return response()->json([
             'success' => true,

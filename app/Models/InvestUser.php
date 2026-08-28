@@ -14,9 +14,12 @@ class InvestUser extends Model
         'player_name',
         'uuid',
         'is_bedrock',
-        'pin_hash',
-        'cash_balance',
         'last_login_at'
+    ];
+
+    protected $guarded = [
+        'pin_hash',
+        'cash_balance'
     ];
 
     protected $casts = [

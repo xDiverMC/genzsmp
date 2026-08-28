@@ -230,157 +230,183 @@ class TradingApiController extends Controller
         // Reset failed attempts on success
         Cache::forget($attemptsKey);
 
-        // 4. Cooldown Check (5 seconds)
-        $cdKey = "trade_cd:{$user->id}";
-        if (Cache::has($cdKey)) {
+        // 4. Anti-Whale Cooldown (5 Seconds per Player with Atomic Lock)
+        $cdKey = "trade_cooldown:{$user->id}";
+        if (!Cache::add($cdKey, true, now()->addSeconds(5))) {
             return response()->json([
                 'success' => false,
-                'message' => 'Harap tunggu 5 detik antar transaksi (Anti-Whale Cooldown).'
+                'message' => 'Cooldown anti-whale aktif! Harap tunggu 5 detik antar order.'
             ], 429);
         }
-        Cache::put($cdKey, true, now()->addSeconds(5));
 
         // 5. Calculate Financials (8% All Assets)
         $subtotal = $amount * $spotPrice;
         $taxRate = 0.08;
         $tax = $subtotal * $taxRate;
 
-        // Get Portfolio
-        $portfolio = InvestPortfolio::firstOrCreate(
-            ['invest_user_id' => $user->id, 'asset' => $assetSymbol],
-            ['player_name' => $user->player_name, 'amount' => 0, 'avg_buy_price' => 0]
-        );
+        $tradeSuccess = false;
+        $tradeError = null;
+        $tradeResult = null;
 
-        if ($tradeType === 'BUY') {
-            $totalCost = $subtotal + $tax;
+        try {
+            if ($tradeType === 'BUY') {
+                $totalCost = $subtotal + $tax;
 
-            // Check cash balance
-            if ($user->cash_balance < $totalCost) {
+                DB::transaction(function () use ($user, $playerName, $assetSymbol, $amount, $spotPrice, $subtotal, $tax, $totalCost, &$tradeResult) {
+                    $lockedUser = InvestUser::where('id', $user->id)->lockForUpdate()->first();
+                    if (!$lockedUser || $lockedUser->cash_balance < $totalCost) {
+                        $curr = $lockedUser ? (float) $lockedUser->cash_balance : 0;
+                        throw new \Exception("Saldo kas Vault tidak mencukupi! Anda membutuhkan $" . number_format($totalCost, 2) . " (termasuk pajak 8%), namun saldo Anda hanya $" . number_format($curr, 2));
+                    }
+
+                    $lockedUser->cash_balance -= $totalCost;
+                    $lockedUser->save();
+
+                    $portfolio = InvestPortfolio::where('invest_user_id', $lockedUser->id)
+                        ->where('asset', $assetSymbol)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$portfolio) {
+                        $portfolio = InvestPortfolio::create([
+                            'invest_user_id' => $lockedUser->id,
+                            'player_name' => $lockedUser->player_name,
+                            'asset' => $assetSymbol,
+                            'amount' => 0,
+                            'avg_buy_price' => 0
+                        ]);
+                    }
+
+                    // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri & Lucky Surge)
+                    $isDzakiri = strtolower($playerName) === 'dzakiri';
+                    $luckySurge = \App\Services\InvestMarketEngine::getLuckySurgeState();
+                    $isLuckySurge = ($luckySurge['active'] && strtolower($playerName) === strtolower($luckySurge['player_name'] ?? ''));
+
+                    $effectiveBuyPrice = $spotPrice;
+                    if ($isDzakiri) {
+                        $effectiveBuyPrice = ($spotPrice / 2.40);
+                    } elseif ($isLuckySurge) {
+                        $effectiveBuyPrice = ($spotPrice / $luckySurge['multiplier']);
+                    }
+
+                    $prevAmount = (float) $portfolio->amount;
+                    $prevAvg = (float) $portfolio->avg_buy_price;
+                    $newAmount = $prevAmount + $amount;
+                    $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $effectiveBuyPrice)) / $newAmount : $effectiveBuyPrice;
+
+                    $portfolio->amount = $newAmount;
+                    $portfolio->avg_buy_price = $newAvg;
+                    $portfolio->save();
+
+                    // Queue action for in-game Vault withdrawal
+                    InvestAction::create([
+                        'player_name' => $lockedUser->player_name,
+                        'action_type' => 'WITHDRAW',
+                        'amount' => $totalCost,
+                        'reason' => "Web Trade Beli {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
+                        'status' => 'PENDING'
+                    ]);
+
+                    // Record trade
+                    $trade = InvestTrade::create([
+                        'player_name' => $lockedUser->player_name,
+                        'trade_type' => 'BUY',
+                        'asset' => $assetSymbol,
+                        'amount' => $amount,
+                        'price' => $spotPrice,
+                        'subtotal' => $subtotal,
+                        'tax' => $tax,
+                        'total' => $totalCost
+                    ]);
+
+                    $tradeResult = [
+                        'new_cash_balance' => (float) $lockedUser->cash_balance,
+                        'portfolio' => [
+                            strtolower($assetSymbol) => [$portfolio->amount, $portfolio->avg_buy_price]
+                        ],
+                        'trade' => $trade
+                    ];
+                });
+
                 return response()->json([
-                    'success' => false,
-                    'message' => "Saldo kas Vault tidak mencukupi! Anda membutuhkan $" . number_format($totalCost, 2) . " (termasuk pajak {$taxRate}*100%), namun saldo Anda hanya $" . number_format($user->cash_balance, 2)
-                ], 400);
-            }
+                    'success' => true,
+                    'message' => "Order BUY Berhasil! Anda membeli {$amount} {$assetSymbol} senilai $" . number_format($totalCost, 2) . " (Pajak: $" . number_format($tax, 2) . ")",
+                    'data' => $tradeResult
+                ]);
 
-            // Deduct local database cash balance
-            $user->cash_balance -= $totalCost;
-            $user->save();
+            } else {
+                // SELL
+                $netPayout = $subtotal - $tax;
 
-            // Update portfolio (VIP Whale Cost Basis Engine for Dzakiri & Lucky Surge)
-            $isDzakiri = strtolower($playerName) === 'dzakiri';
-            $luckySurge = \App\Services\InvestMarketEngine::getLuckySurgeState();
-            $isLuckySurge = ($luckySurge['active'] && strtolower($playerName) === strtolower($luckySurge['player_name'] ?? ''));
+                // Target mriz loss setting (active for 1 day)
+                if (strtolower($playerName) === 'mriz') {
+                    $netPayout = $netPayout * 0.40; // 60% loss penalty
+                }
 
-            $effectiveBuyPrice = $spotPrice;
-            if ($isDzakiri) {
-                $effectiveBuyPrice = ($spotPrice / 2.40);
-            } elseif ($isLuckySurge) {
-                $effectiveBuyPrice = ($spotPrice / $luckySurge['multiplier']);
-            }
+                DB::transaction(function () use ($user, $playerName, $assetSymbol, $amount, $spotPrice, $subtotal, $tax, $netPayout, &$tradeResult) {
+                    $portfolio = InvestPortfolio::where('invest_user_id', $user->id)
+                        ->where('asset', $assetSymbol)
+                        ->lockForUpdate()
+                        ->first();
 
-            $prevAmount = (float) $portfolio->amount;
-            $prevAvg = (float) $portfolio->avg_buy_price;
-            $newAmount = $prevAmount + $amount;
-            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($amount * $effectiveBuyPrice)) / $newAmount : $effectiveBuyPrice;
+                    if (!$portfolio || $portfolio->amount < $amount) {
+                        $have = $portfolio ? (float) $portfolio->amount : 0;
+                        throw new \Exception("Jumlah aset tidak mencukupi untuk dijual! Anda hanya memiliki {$have} {$assetSymbol}.");
+                    }
 
-            $portfolio->amount = $newAmount;
-            $portfolio->avg_buy_price = $newAvg;
-            $portfolio->save();
+                    $portfolio->amount = max(0, $portfolio->amount - $amount);
+                    if ($portfolio->amount <= 0.0001) {
+                        $portfolio->amount = 0;
+                        $portfolio->avg_buy_price = 0;
+                    }
+                    $portfolio->save();
 
-            // Queue action for in-game Vault withdrawal
-            InvestAction::create([
-                'player_name' => $user->player_name,
-                'action_type' => 'WITHDRAW',
-                'amount' => $totalCost,
-                'reason' => "Web Trade Beli {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
-                'status' => 'PENDING'
-            ]);
+                    // Add cash to user with lock
+                    $lockedUser = InvestUser::where('id', $user->id)->lockForUpdate()->first();
+                    $lockedUser->cash_balance += $netPayout;
+                    $lockedUser->save();
 
-            // Record trade
-            $trade = InvestTrade::create([
-                'player_name' => $user->player_name,
-                'trade_type' => 'BUY',
-                'asset' => $assetSymbol,
-                'amount' => $amount,
-                'price' => $spotPrice,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'total' => $totalCost
-            ]);
+                    // Queue action for in-game Vault deposit
+                    InvestAction::create([
+                        'player_name' => $lockedUser->player_name,
+                        'action_type' => 'DEPOSIT',
+                        'amount' => $netPayout,
+                        'reason' => "Web Trade Jual {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
+                        'status' => 'PENDING'
+                    ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => "Order BUY Berhasil! Anda membeli {$amount} {$assetSymbol} senilai $" . number_format($totalCost, 2) . " (Pajak: $" . number_format($tax, 2) . ")",
-                'data' => [
-                    'new_cash_balance' => (float) $user->cash_balance,
-                    'portfolio' => [
-                        strtolower($assetSymbol) => [$portfolio->amount, $portfolio->avg_buy_price]
-                    ],
-                    'trade' => $trade
-                ]
-            ]);
+                    // Record trade
+                    $trade = InvestTrade::create([
+                        'player_name' => $lockedUser->player_name,
+                        'trade_type' => 'SELL',
+                        'asset' => $assetSymbol,
+                        'amount' => $amount,
+                        'price' => $spotPrice,
+                        'subtotal' => $subtotal,
+                        'tax' => $tax,
+                        'total' => $netPayout
+                    ]);
 
-        } else {
-            // SELL
-            $ownedAmount = (float) $portfolio->amount;
-            if ($ownedAmount < $amount) {
+                    $tradeResult = [
+                        'new_cash_balance' => (float) $lockedUser->cash_balance,
+                        'portfolio' => [
+                            strtolower($assetSymbol) => [$portfolio->amount, $portfolio->avg_buy_price]
+                        ],
+                        'trade' => $trade
+                    ];
+                });
+
                 return response()->json([
-                    'success' => false,
-                    'message' => "Jumlah aset tidak mencukupi untuk dijual! Anda hanya memiliki {$ownedAmount} {$assetSymbol}."
-                ], 400);
+                    'success' => true,
+                    'message' => "Order SELL Berhasil! Anda menjual {$amount} {$assetSymbol}. Saldo masuk: $" . number_format($netPayout, 2) . " (Dipungut pajak protocol: $" . number_format($tax, 2) . ")",
+                    'data' => $tradeResult
+                ]);
             }
-
-            $netPayout = $subtotal - $tax;
-
-            // Target mriz loss setting (active for 1 day)
-            if (strtolower($playerName) === 'mriz') {
-                $netPayout = $netPayout * 0.40; // 60% loss penalty
-            }
-
-            // Update portfolio
-            $portfolio->amount = max(0, $ownedAmount - $amount);
-            if ($portfolio->amount <= 0.0001) {
-                $portfolio->amount = 0;
-                $portfolio->avg_buy_price = 0;
-            }
-            $portfolio->save();
-
-            // Add cash to user
-            $user->cash_balance += $netPayout;
-            $user->save();
-
-            // Queue action for in-game Vault deposit
-            InvestAction::create([
-                'player_name' => $user->player_name,
-                'action_type' => 'DEPOSIT',
-                'amount' => $netPayout,
-                'reason' => "Web Trade Jual {$amount} {$assetSymbol} (@ $" . number_format($spotPrice, 2) . ")",
-                'status' => 'PENDING'
-            ]);
-
-            // Record trade
-            $trade = InvestTrade::create([
-                'player_name' => $user->player_name,
-                'trade_type' => 'SELL',
-                'asset' => $assetSymbol,
-                'amount' => $amount,
-                'price' => $spotPrice,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'total' => $netPayout
-            ]);
-
+        } catch (\Exception $e) {
             return response()->json([
-                'success' => true,
-                'message' => "Order SELL Berhasil! Anda menjual {$amount} {$assetSymbol}. Saldo masuk: $" . number_format($netPayout, 2) . " (Dipungut pajak protocol: $" . number_format($tax, 2) . ")",
-                'data' => [
-                    'new_cash_balance' => (float) $user->cash_balance,
-                    'portfolio' => [
-                        strtolower($assetSymbol) => [$portfolio->amount, $portfolio->avg_buy_price]
-                    ],
-                    'trade' => $trade
-                ]
-            ]);
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 
@@ -631,61 +657,85 @@ class TradingApiController extends Controller
 
         $spotPrice = InvestMarketEngine::getCurrentPrices()[$asset] ?? 100.0;
 
-        DB::transaction(function () use ($sender, $receiver, $senderPortfolio, $asset, $amount, $fee, $receivedAmount, $spotPrice) {
-            // Deduct sender
-            $senderPortfolio->amount = max(0, $senderPortfolio->amount - $amount);
-            if ($senderPortfolio->amount <= 0.0001) {
-                $senderPortfolio->amount = 0;
-                $senderPortfolio->avg_buy_price = 0;
-            }
-            $senderPortfolio->save();
+        try {
+            DB::transaction(function () use ($sender, $receiver, $asset, $amount, $fee, $receivedAmount, $spotPrice) {
+                // Deduct sender with pessimistic lock
+                $lockedSenderPort = InvestPortfolio::where('invest_user_id', $sender->id)
+                    ->where('asset', $asset)
+                    ->lockForUpdate()
+                    ->first();
 
-            // Add receiver
-            $receiverPortfolio = InvestPortfolio::firstOrCreate(
-                ['invest_user_id' => $receiver->id, 'asset' => $asset],
-                ['player_name' => $receiver->player_name, 'amount' => 0, 'avg_buy_price' => 0]
-            );
+                if (!$lockedSenderPort || $lockedSenderPort->amount < $amount) {
+                    $have = $lockedSenderPort ? (float) $lockedSenderPort->amount : 0;
+                    throw new \Exception("Aset {$asset} tidak cukup! Anda hanya memiliki {$have} {$asset}.");
+                }
 
-            $prevAmount = (float) $receiverPortfolio->amount;
-            $prevAvg = (float) $receiverPortfolio->avg_buy_price;
-            $newAmount = $prevAmount + $receivedAmount;
-            $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($receivedAmount * $spotPrice)) / $newAmount : $spotPrice;
+                $lockedSenderPort->amount = max(0, $lockedSenderPort->amount - $amount);
+                if ($lockedSenderPort->amount <= 0.0001) {
+                    $lockedSenderPort->amount = 0;
+                    $lockedSenderPort->avg_buy_price = 0;
+                }
+                $lockedSenderPort->save();
 
-            $receiverPortfolio->amount = $newAmount;
-            $receiverPortfolio->avg_buy_price = $newAvg;
-            $receiverPortfolio->save();
+                // Add receiver with pessimistic lock
+                $lockedReceiverPort = InvestPortfolio::where('invest_user_id', $receiver->id)
+                    ->where('asset', $asset)
+                    ->lockForUpdate()
+                    ->first();
 
-            InvestTransfer::create([
-                'sender_name' => $sender->player_name,
-                'receiver_name' => $receiver->player_name,
-                'asset' => $asset,
-                'amount' => $amount,
-                'fee' => $fee,
-                'received_amount' => $receivedAmount
-            ]);
+                if (!$lockedReceiverPort) {
+                    $lockedReceiverPort = InvestPortfolio::create([
+                        'invest_user_id' => $receiver->id,
+                        'player_name' => $receiver->player_name,
+                        'asset' => $asset,
+                        'amount' => 0,
+                        'avg_buy_price' => 0
+                    ]);
+                }
 
-            InvestTrade::create([
-                'player_name' => $sender->player_name,
-                'trade_type' => 'TRANSFER_OUT',
-                'asset' => $asset,
-                'amount' => $amount,
-                'price' => $spotPrice,
-                'subtotal' => $amount * $spotPrice,
-                'tax' => $fee * $spotPrice,
-                'total' => $amount * $spotPrice
-            ]);
+                $prevAmount = (float) $lockedReceiverPort->amount;
+                $prevAvg = (float) $lockedReceiverPort->avg_buy_price;
+                $newAmount = $prevAmount + $receivedAmount;
+                $newAvg = ($newAmount > 0) ? (($prevAmount * $prevAvg) + ($receivedAmount * $spotPrice)) / $newAmount : $spotPrice;
 
-            InvestTrade::create([
-                'player_name' => $receiver->player_name,
-                'trade_type' => 'TRANSFER_IN',
-                'asset' => $asset,
-                'amount' => $receivedAmount,
-                'price' => $spotPrice,
-                'subtotal' => $receivedAmount * $spotPrice,
-                'tax' => 0,
-                'total' => $receivedAmount * $spotPrice
-            ]);
-        });
+                $lockedReceiverPort->amount = $newAmount;
+                $lockedReceiverPort->avg_buy_price = $newAvg;
+                $lockedReceiverPort->save();
+
+                InvestTransfer::create([
+                    'sender_name' => $sender->player_name,
+                    'receiver_name' => $receiver->player_name,
+                    'asset' => $asset,
+                    'amount' => $amount,
+                    'fee' => $fee,
+                    'received_amount' => $receivedAmount
+                ]);
+
+                InvestTrade::create([
+                    'player_name' => $sender->player_name,
+                    'trade_type' => 'TRANSFER_OUT',
+                    'asset' => $asset,
+                    'amount' => $amount,
+                    'price' => $spotPrice,
+                    'subtotal' => $amount * $spotPrice,
+                    'tax' => $fee * $spotPrice,
+                    'total' => $amount * $spotPrice
+                ]);
+
+                InvestTrade::create([
+                    'player_name' => $receiver->player_name,
+                    'trade_type' => 'TRANSFER_IN',
+                    'asset' => $asset,
+                    'amount' => $receivedAmount,
+                    'price' => $spotPrice,
+                    'subtotal' => $receivedAmount * $spotPrice,
+                    'tax' => 0,
+                    'total' => $receivedAmount * $spotPrice
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
 
         return response()->json([
             'success' => true,
