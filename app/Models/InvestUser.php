@@ -25,6 +25,10 @@ class InvestUser extends Model
         'last_login_at' => 'datetime'
     ];
 
+    protected $hidden = [
+        'pin_hash'
+    ];
+
     public function portfolios()
     {
         return $this->hasMany(InvestPortfolio::class, 'invest_user_id');
