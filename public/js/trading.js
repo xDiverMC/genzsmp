@@ -39,14 +39,23 @@ const state = {
   candles: {},
   limitOrders: [],
   priceAlerts: [],
-  tradeLogs: []
+  tradeLogs: [],
+  indicators: {
+    ema: true,      // EMA 9 & EMA 21
+    sma: false,     // SMA 50
+    volume: true,   // Volume Histogram
+  }
 };
 
 let tvChart = null;
 let tvCandleSeries = null;
 let tvVolumeSeries = null;
+let tvEma9Series = null;
+let tvEma21Series = null;
+let tvSma50Series = null;
 let chartInstance = null; // Chart.js fallback
 let cooldownTimer = null;
+let candleCountdownInterval = null;
 
 // =======================================================
 //   INITIALIZATION
@@ -83,6 +92,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Poll server market data every 3 seconds for uniform server prices & candles
   fetchMarketData();
   setInterval(fetchMarketData, 3000);
+
+  // Live Candle Countdown Timer
+  updateCandleCountdown();
+  candleCountdownInterval = setInterval(updateCandleCountdown, 1000);
 });
 
 // =======================================================
@@ -136,7 +149,38 @@ async function fetchMarketData() {
 }
 
 // =======================================================
-//   TRADINGVIEW LIGHTWEIGHT CHARTS / CHART.JS
+//   TECHNICAL ANALYSIS HELPERS (EMA, SMA)
+// =======================================================
+function calculateEMA(data, period) {
+  if (!data || data.length < 2) return [];
+  const k = 2 / (period + 1);
+  const result = [];
+  let ema = data[0].close;
+  for (let i = 0; i < data.length; i++) {
+    const close = data[i].close;
+    ema = (i === 0) ? close : (close * k) + (ema * (1 - k));
+    if (i >= Math.min(period - 1, data.length - 1)) {
+      result.push({ time: data[i].time, value: parseFloat(ema.toFixed(2)) });
+    }
+  }
+  return result;
+}
+
+function calculateSMA(data, period) {
+  if (!data || data.length < period) return [];
+  const result = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += data[i - j].close;
+    }
+    result.push({ time: data[i].time, value: parseFloat((sum / period).toFixed(2)) });
+  }
+  return result;
+}
+
+// =======================================================
+//   TRADINGVIEW LIGHTWEIGHT CHARTS PRO / CHART.JS
 // =======================================================
 function initTradingViewChart() {
   const container = document.getElementById('tv-chart-container');
@@ -147,7 +191,7 @@ function initTradingViewChart() {
       container.innerHTML = '';
       tvChart = LightweightCharts.createChart(container, {
         width: container.clientWidth || 600,
-        height: 370,
+        height: 400,
         layout: {
           background: { color: 'transparent' },
           textColor: '#9ca3af',
@@ -155,36 +199,95 @@ function initTradingViewChart() {
           fontFamily: 'JetBrains Mono, monospace',
         },
         grid: {
-          vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
-          horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+          vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+          horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
         },
         crosshair: {
           mode: LightweightCharts.CrosshairMode.Normal,
+          vertLine: {
+            color: 'rgba(168, 85, 247, 0.4)',
+            width: 1,
+            style: LightweightCharts.LineStyle.Dashed,
+            labelBackgroundColor: '#1e1b4b',
+          },
+          horzLine: {
+            color: 'rgba(168, 85, 247, 0.4)',
+            width: 1,
+            style: LightweightCharts.LineStyle.Dashed,
+            labelBackgroundColor: '#1e1b4b',
+          },
         },
         rightPriceScale: {
-          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderColor: 'rgba(255, 255, 255, 0.08)',
+          scaleMargins: { top: 0.12, bottom: 0.22 },
+          autoScale: true,
         },
         timeScale: {
-          borderColor: 'rgba(255, 255, 255, 0.1)',
+          borderColor: 'rgba(255, 255, 255, 0.08)',
           timeVisible: true,
           secondsVisible: false,
+          rightOffset: 10,
+          barSpacing: 10,
+          minBarSpacing: 4,
         },
       });
 
+      // 1. Candlestick Series (TradingView Standard Crisp Colors)
       tvCandleSeries = tvChart.addCandlestickSeries({
-        upColor: '#10B981',
-        downColor: '#EF4444',
-        borderDownColor: '#EF4444',
-        borderUpColor: '#10B981',
-        wickDownColor: '#EF4444',
-        wickUpColor: '#10B981',
+        upColor: '#089981',
+        downColor: '#f23645',
+        borderDownColor: '#f23645',
+        borderUpColor: '#089981',
+        wickDownColor: '#f23645',
+        wickUpColor: '#089981',
+        priceFormat: {
+          type: 'price',
+          precision: 2,
+          minMove: 0.01,
+        },
       });
 
+      // 2. Volume Histogram Series (Bottom Docked)
       tvVolumeSeries = tvChart.addHistogramSeries({
-        color: '#8b5cf6',
         priceFormat: { type: 'volume' },
         priceScaleId: '',
-        scaleMargins: { top: 0.8, bottom: 0 },
+        scaleMargins: { top: 0.82, bottom: 0 },
+        visible: state.indicators.volume,
+      });
+
+      // 3. Technical Indicator: EMA 9 (Cyan Fast Line)
+      tvEma9Series = tvChart.addLineSeries({
+        color: '#06b6d4',
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: true,
+        visible: state.indicators.ema,
+      });
+
+      // 4. Technical Indicator: EMA 21 (Amber Medium Line)
+      tvEma21Series = tvChart.addLineSeries({
+        color: '#f59e0b',
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: true,
+        crosshairMarkerVisible: true,
+        visible: state.indicators.ema,
+      });
+
+      // 5. Technical Indicator: SMA 50 (Purple Trend Line)
+      tvSma50Series = tvChart.addLineSeries({
+        color: '#a855f7',
+        lineWidth: 1.5,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: true,
+        visible: state.indicators.sma,
+      });
+
+      // Interactive Crosshair Move Listener for Live OHLC Legend
+      tvChart.subscribeCrosshairMove((param) => {
+        updateChartLegend(param);
       });
 
       window.addEventListener('resize', () => {
@@ -198,6 +301,84 @@ function initTradingViewChart() {
     }
   } else {
     initChartJsFallback();
+  }
+}
+
+function updateChartLegend(param) {
+  const sym = state.assets[state.activeAsset] ? state.assets[state.activeAsset].symbol : 'BTC';
+  const rawCandles = state.candles[sym] || [];
+  if (rawCandles.length === 0) return;
+
+  const legendAsset = document.getElementById('legend-asset');
+  const legendTf = document.getElementById('legend-tf');
+  const legendOpen = document.getElementById('legend-open');
+  const legendHigh = document.getElementById('legend-high');
+  const legendLow = document.getElementById('legend-low');
+  const legendClose = document.getElementById('legend-close');
+  const legendChange = document.getElementById('legend-change');
+  const legendEma9 = document.getElementById('legend-ema9');
+  const legendEma21 = document.getElementById('legend-ema21');
+  const legendSma50 = document.getElementById('legend-sma50');
+
+  if (legendAsset) legendAsset.textContent = sym + '/USD';
+  if (legendTf) legendTf.textContent = state.timeframe.toUpperCase();
+
+  let candle = null;
+  let ema9Val = null;
+  let ema21Val = null;
+  let sma50Val = null;
+
+  if (param && param.time && tvCandleSeries) {
+    const data = param.seriesData.get(tvCandleSeries);
+    if (data) {
+      candle = data;
+    }
+    if (tvEma9Series) {
+      const d = param.seriesData.get(tvEma9Series);
+      if (d) ema9Val = d.value;
+    }
+    if (tvEma21Series) {
+      const d = param.seriesData.get(tvEma21Series);
+      if (d) ema21Val = d.value;
+    }
+    if (tvSma50Series) {
+      const d = param.seriesData.get(tvSma50Series);
+      if (d) sma50Val = d.value;
+    }
+  }
+
+  if (!candle) {
+    candle = rawCandles[rawCandles.length - 1];
+  }
+
+  if (candle) {
+    const isUp = (candle.close >= candle.open);
+    const diff = candle.close - candle.open;
+    const pct = candle.open > 0 ? (diff / candle.open) * 100 : 0;
+    const sign = diff >= 0 ? '+' : '';
+    const colorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
+
+    if (legendOpen) legendOpen.textContent = '$' + Number(candle.open).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (legendHigh) legendHigh.textContent = '$' + Number(candle.high).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (legendLow) legendLow.textContent = '$' + Number(candle.low).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (legendClose) {
+      legendClose.textContent = '$' + Number(candle.close).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      legendClose.className = `${colorClass} font-bold`;
+    }
+    if (legendChange) {
+      legendChange.textContent = `${sign}${pct.toFixed(2)}%`;
+      legendChange.className = `${colorClass} font-black`;
+    }
+
+    if (legendEma9 && ema9Val !== null) {
+      legendEma9.textContent = '$' + Number(ema9Val).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
+    if (legendEma21 && ema21Val !== null) {
+      legendEma21.textContent = '$' + Number(ema21Val).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
+    if (legendSma50 && sma50Val !== null) {
+      legendSma50.textContent = '$' + Number(sma50Val).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
   }
 }
 
@@ -216,8 +397,8 @@ function initChartJsFallback() {
 
   const asset = state.assets[state.activeAsset];
   const isUp = (asset && asset.changePercent >= 0);
-  const gradientColor = isUp ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
-  const lineColor = isUp ? '#10B981' : '#EF4444';
+  const gradientColor = isUp ? 'rgba(8, 153, 129, 0.22)' : 'rgba(242, 54, 69, 0.22)';
+  const lineColor = isUp ? '#089981' : '#f23645';
 
   const sym = asset ? asset.symbol : 'BTC';
   const rawCandles = state.candles[sym] || [];
@@ -308,8 +489,8 @@ function updateChartData() {
       });
       const dataPoints = rawCandles.map(c => c.close);
       const isUp = (state.assets[state.activeAsset] && state.assets[state.activeAsset].changePercent >= 0);
-      const lineColor = isUp ? '#10B981' : '#EF4444';
-      const gradientColor = isUp ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)';
+      const lineColor = isUp ? '#089981' : '#f23645';
+      const gradientColor = isUp ? 'rgba(8, 153, 129, 0.22)' : 'rgba(242, 54, 69, 0.22)';
 
       chartInstance.data.labels = labels;
       chartInstance.data.datasets[0].data = dataPoints;
@@ -334,15 +515,38 @@ function updateChartData() {
       }));
       tvCandleSeries.setData(candleData);
 
+      // Volume Series
       if (tvVolumeSeries) {
         const volumeData = rawCandles.map(c => ({
           time: c.time,
           value: c.volume,
-          color: c.close >= c.open ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'
+          color: c.close >= c.open ? 'rgba(8, 153, 129, 0.35)' : 'rgba(242, 54, 69, 0.35)'
         }));
         tvVolumeSeries.setData(volumeData);
       }
-    } catch (e) {}
+
+      // Technical Indicators: EMA 9 & EMA 21
+      if (tvEma9Series) {
+        const ema9Data = calculateEMA(candleData, 9);
+        tvEma9Series.setData(ema9Data);
+      }
+      if (tvEma21Series) {
+        const ema21Data = calculateEMA(candleData, 21);
+        tvEma21Series.setData(ema21Data);
+      }
+
+      // Technical Indicator: SMA 50
+      if (tvSma50Series) {
+        const sma50Data = calculateSMA(candleData, 50);
+        tvSma50Series.setData(sma50Data);
+      }
+
+      // Update static legend with latest candle
+      updateChartLegend(null);
+
+    } catch (e) {
+      console.warn('TradingView data update error:', e);
+    }
   }
 }
 
@@ -367,6 +571,7 @@ function setChartStyle(style) {
   const lineBtn = document.getElementById('chart-style-line');
   const tvWrapper = document.getElementById('tv-chart-container');
   const chartJsWrapper = document.getElementById('chartjs-container');
+  const legend = document.getElementById('chart-legend');
 
   if (style === 'candle') {
     if (candleBtn) {
@@ -377,6 +582,7 @@ function setChartStyle(style) {
     }
     if (tvWrapper) tvWrapper.classList.remove('hidden');
     if (chartJsWrapper) chartJsWrapper.classList.add('hidden');
+    if (legend) legend.style.display = 'flex';
     if (tvCandleSeries) updateChartData();
   } else {
     if (lineBtn) {
@@ -387,9 +593,76 @@ function setChartStyle(style) {
     }
     if (tvWrapper) tvWrapper.classList.add('hidden');
     if (chartJsWrapper) chartJsWrapper.classList.remove('hidden');
+    if (legend) legend.style.display = 'none';
     initChartJsFallback();
   }
   if (window.lucide) lucide.createIcons();
+}
+
+function toggleIndicator(type) {
+  if (type === 'ema') {
+    state.indicators.ema = !state.indicators.ema;
+    if (tvEma9Series) tvEma9Series.applyOptions({ visible: state.indicators.ema });
+    if (tvEma21Series) tvEma21Series.applyOptions({ visible: state.indicators.ema });
+    const btn = document.getElementById('btn-ind-ema');
+    const group = document.getElementById('legend-ema-group');
+    if (btn) {
+      btn.className = state.indicators.ema 
+        ? 'px-2.5 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold flex items-center gap-1 hover:bg-cyan-500/25 transition cursor-pointer'
+        : 'px-2.5 py-0.5 rounded-lg bg-neutral-900 text-neutral-400 border border-neutral-800 font-semibold flex items-center gap-1 hover:text-white transition cursor-pointer';
+    }
+    if (group) {
+      group.style.display = state.indicators.ema ? 'inline-flex' : 'none';
+    }
+  } else if (type === 'sma') {
+    state.indicators.sma = !state.indicators.sma;
+    if (tvSma50Series) tvSma50Series.applyOptions({ visible: state.indicators.sma });
+    const btn = document.getElementById('btn-ind-sma');
+    const badge = document.getElementById('legend-sma-badge');
+    if (btn) {
+      btn.className = state.indicators.sma 
+        ? 'px-2.5 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1 hover:bg-purple-500/25 transition cursor-pointer'
+        : 'px-2.5 py-0.5 rounded-lg bg-neutral-900 text-neutral-400 border border-neutral-800 font-semibold flex items-center gap-1 hover:text-white transition cursor-pointer';
+    }
+    if (badge) {
+      badge.style.display = state.indicators.sma ? 'inline-flex' : 'none';
+    }
+  } else if (type === 'volume') {
+    state.indicators.volume = !state.indicators.volume;
+    if (tvVolumeSeries) tvVolumeSeries.applyOptions({ visible: state.indicators.volume });
+    const btn = document.getElementById('btn-ind-vol');
+    if (btn) {
+      btn.className = state.indicators.volume 
+        ? 'px-2.5 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1 hover:bg-purple-500/25 transition cursor-pointer'
+        : 'px-2.5 py-0.5 rounded-lg bg-neutral-900 text-neutral-400 border border-neutral-800 font-semibold flex items-center gap-1 hover:text-white transition cursor-pointer';
+    }
+  }
+}
+
+function resetChartZoom() {
+  if (tvChart) {
+    tvChart.timeScale().fitContent();
+  }
+}
+
+function updateCandleCountdown() {
+  const el = document.getElementById('candle-countdown');
+  if (!el) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  let tfSeconds = 300;
+  switch (state.timeframe) {
+    case '1m': tfSeconds = 60; break;
+    case '5m': tfSeconds = 300; break;
+    case '15m': tfSeconds = 900; break;
+    case '1h': tfSeconds = 3600; break;
+    case '1d': tfSeconds = 86400; break;
+  }
+
+  const remaining = tfSeconds - (now % tfSeconds);
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  el.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
 // =======================================================

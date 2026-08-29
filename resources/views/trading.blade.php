@@ -350,38 +350,91 @@
               </div>
             </div>
 
-            <!-- Timeframe & Chart Style Controls -->
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
-                <button onclick="setTimeframe('1m')" id="tf-1m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1M</button>
-                <button onclick="setTimeframe('5m')" id="tf-5m" class="tf-btn active px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition">5M</button>
-                <button onclick="setTimeframe('15m')" id="tf-15m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">15M</button>
-                <button onclick="setTimeframe('1h')" id="tf-1h" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1H</button>
-                <button onclick="setTimeframe('1d')" id="tf-1d" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
+            <!-- Timeframe, Chart Style & Technical Indicators Controls -->
+            <div class="space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- Timeframe Selector -->
+                <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
+                  <button onclick="setTimeframe('1m')" id="tf-1m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1M</button>
+                  <button onclick="setTimeframe('5m')" id="tf-5m" class="tf-btn active px-2.5 py-1 rounded-lg bg-primary text-white font-bold transition">5M</button>
+                  <button onclick="setTimeframe('15m')" id="tf-15m" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">15M</button>
+                  <button onclick="setTimeframe('1h')" id="tf-1h" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1H</button>
+                  <button onclick="setTimeframe('1d')" id="tf-1d" class="tf-btn px-2.5 py-1 rounded-lg text-neutral-400 hover:text-white transition">1D</button>
+                </div>
+
+                <!-- Candle Countdown Badge -->
+                <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-neutral-950 border border-neutral-900 text-[11px] font-mono text-neutral-400">
+                  <span class="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                  <span>Candle:</span>
+                  <span id="candle-countdown" class="text-cyan-300 font-bold font-mono">00:60</span>
+                </div>
+
+                <!-- Chart Style Selector: Candlestick vs Chart Lama (Garis) -->
+                <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
+                  <button onclick="setChartStyle('candle')" id="chart-style-candle" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold flex items-center gap-1.5 transition shadow-md shadow-purple-500/20 cursor-pointer">
+                    <i data-lucide="candlestick-chart" class="h-3.5 w-3.5"></i>
+                    <span>Candlestick (Pro)</span>
+                  </button>
+                  <button onclick="setChartStyle('line')" id="chart-style-line" class="px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
+                    <i data-lucide="trending-up" class="h-3.5 w-3.5"></i>
+                    <span>Garis</span>
+                  </button>
+                </div>
               </div>
 
-              <!-- Chart Style Selector: Candlestick vs Chart Lama (Garis) -->
-              <div class="flex items-center gap-1 bg-neutral-950 p-1 rounded-xl border border-neutral-900 text-xs font-mono">
-                <button onclick="setChartStyle('candle')" id="chart-style-candle" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold flex items-center gap-1.5 transition shadow-md shadow-purple-500/20 cursor-pointer">
-                  <i data-lucide="candlestick-chart" class="h-3.5 w-3.5"></i>
-                  <span>Candlestick (Pro)</span>
-                </button>
-                <button onclick="setChartStyle('line')" id="chart-style-line" class="px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer">
-                  <i data-lucide="trending-up" class="h-3.5 w-3.5"></i>
-                  <span>Chart Lama (Garis)</span>
-                </button>
-              </div>
+              <!-- Technical Analysis Indicators Toolbar -->
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-neutral-900/60 text-[11px] font-mono">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-neutral-500 text-[10px] uppercase font-bold tracking-wider mr-1">Indikator:</span>
+                  <button onclick="toggleIndicator('ema')" id="btn-ind-ema" class="px-2.5 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold flex items-center gap-1 hover:bg-cyan-500/25 transition cursor-pointer">
+                    <span class="h-2 w-2 rounded-full bg-cyan-400"></span>
+                    <span>EMA 9/21</span>
+                  </button>
+                  <button onclick="toggleIndicator('sma')" id="btn-ind-sma" class="px-2.5 py-0.5 rounded-lg bg-neutral-900 text-neutral-400 border border-neutral-800 font-semibold flex items-center gap-1 hover:text-white transition cursor-pointer">
+                    <span class="h-2 w-2 rounded-full bg-purple-400"></span>
+                    <span>SMA 50</span>
+                  </button>
+                  <button onclick="toggleIndicator('volume')" id="btn-ind-vol" class="px-2.5 py-0.5 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30 font-semibold flex items-center gap-1 hover:bg-purple-500/25 transition cursor-pointer">
+                    <i data-lucide="bar-chart-2" class="h-3 w-3 text-purple-400"></i>
+                    <span>Volume</span>
+                  </button>
+                  <button onclick="resetChartZoom()" title="Reset Zoom / Fit Content" class="p-1 rounded-lg bg-neutral-900 text-neutral-400 border border-neutral-800 hover:text-white transition cursor-pointer">
+                    <i data-lucide="maximize-2" class="h-3 w-3"></i>
+                  </button>
+                </div>
 
-              <div class="flex items-center gap-4 text-xs font-mono text-neutral-400">
-                <div>High: <span id="stat-high" class="text-white font-bold">,080</span></div>
-                <div>Low: <span id="stat-low" class="text-white font-bold">50</span></div>
-                <div>Vol: <span id="stat-vol" class="text-primary font-bold">24.5K</span></div>
+                <div class="flex items-center gap-3 text-[11px] font-mono text-neutral-400">
+                  <div>High: <span id="stat-high" class="text-white font-bold">$1,080</span></div>
+                  <div>Low: <span id="stat-low" class="text-white font-bold">$950</span></div>
+                  <div>Vol: <span id="stat-vol" class="text-primary font-bold">24.5K</span></div>
+                </div>
               </div>
             </div>
 
-            <!-- Candlestick / TradingView Chart Container -->
-            <div id="tv-chart-wrapper" class="relative h-[380px] w-full pt-2 rounded-xl overflow-hidden bg-neutral-950/60 border border-neutral-900">
+            <!-- Candlestick / TradingView Chart Container with Floating Legend -->
+            <div id="tv-chart-wrapper" class="relative h-[410px] w-full pt-2 rounded-xl overflow-hidden bg-neutral-950/80 border border-neutral-900 shadow-inner">
+              
+              <!-- Realtime Interactive OHLC Legend -->
+              <div id="chart-legend" class="absolute top-3 left-3 z-20 flex flex-wrap items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-950/90 backdrop-blur-md border border-neutral-800/80 text-[11px] font-mono shadow-xl pointer-events-none transition-all">
+                <span id="legend-asset" class="font-black text-white tracking-wider">BTC/USD</span>
+                <span id="legend-tf" class="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[10px] font-bold uppercase">5M</span>
+                <span class="text-neutral-600">|</span>
+                <span class="text-neutral-400">O:</span> <span id="legend-open" class="text-white font-bold">$0.00</span>
+                <span class="text-neutral-400">H:</span> <span id="legend-high" class="text-white font-bold">$0.00</span>
+                <span class="text-neutral-400">L:</span> <span id="legend-low" class="text-white font-bold">$0.00</span>
+                <span class="text-neutral-400">C:</span> <span id="legend-close" class="text-emerald-400 font-bold">$0.00</span>
+                <span id="legend-change" class="text-emerald-400 font-black">+0.00%</span>
+                <span id="legend-ema-group" class="hidden md:inline-flex items-center gap-2 pl-2 border-l border-neutral-800">
+                  <span class="text-cyan-400">EMA9: <span id="legend-ema9" class="font-bold">$0.00</span></span>
+                  <span class="text-amber-400">EMA21: <span id="legend-ema21" class="font-bold">$0.00</span></span>
+                  <span id="legend-sma-badge" class="hidden text-purple-400">SMA50: <span id="legend-sma50" class="font-bold">$0.00</span></span>
+                </span>
+              </div>
+
+              <!-- Main TradingView Chart Target -->
               <div id="tv-chart-container" class="w-full h-full"></div>
+              
+              <!-- Fallback Chart.js Target -->
               <div id="chartjs-container" class="hidden w-full h-full p-2">
                 <canvas id="tradingChart"></canvas>
               </div>

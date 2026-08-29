@@ -105,7 +105,7 @@ class InvestMarketEngine
     }
 
     /**
-     * Tick market prices with realistic dynamic market waves & auto-fill limit orders / alerts.
+     * Tick market prices with realistic harmonic market waves & auto-fill limit orders / alerts.
      */
     protected static function tickMarket(array $state): array
     {
@@ -119,35 +119,43 @@ class InvestMarketEngine
         foreach ($state['prices'] as $sym => $currentPrice) {
             $base = self::BASE_PRICES[$sym];
 
-            // Initialize or switch momentum trend for this asset (15-35 ticks per mini-cycle)
+            // 1. Initialize or switch momentum trend (12 to 30 ticks per mini-cycle)
             if (!isset($state['trend'][$sym]) || ($state['trend'][$sym]['ticks_left'] ?? 0) <= 0) {
-                // Determine new trend: 45% Bull, 45% Bear, 10% Sideways
+                // 42% Bullish, 42% Bearish, 16% Sideways Consolidation
                 $rnd = mt_rand(1, 100);
-                $dir = ($rnd <= 45) ? 1 : (($rnd <= 90) ? -1 : 0);
+                $dir = ($rnd <= 42) ? 1 : (($rnd <= 84) ? -1 : 0);
                 $state['trend'][$sym] = [
                     'direction' => $dir,
-                    'ticks_left' => mt_rand(15, 35),
-                    'volatility' => mt_rand(15, 45) / 10000.0, // 0.15% to 0.45% per tick
+                    'ticks_left' => mt_rand(12, 30),
+                    'volatility' => mt_rand(8, 24) / 10000.0, // 0.08% to 0.24% trend impulse
                 ];
             }
 
             $trend = &$state['trend'][$sym];
             $trend['ticks_left']--;
 
-            // Micro-tick noise + Trend impulse + Mean Reversion pull around baseline
-            $noise = (mt_rand(-20, 20) / 10000.0);
-            $trendStep = $trend['direction'] * $trend['volatility'];
+            // 2. Harmonic Multi-Wave Market Cycles (Macro 4H + Swing 45M + Micro 10M)
+            $macroWave = sin((2 * M_PI * $currentTime) / 14400.0) * 0.0006;
+            $swingWave = sin((2 * M_PI * $currentTime) / 2700.0) * 0.0004;
+            $microWave = cos((2 * M_PI * $currentTime) / 600.0) * 0.0002;
 
-            // Mean reversion: if price gets too high above baseline, pull down; if too low, pull up
+            // 3. Smooth Micro-tick noise + Trend Step
+            $noise = (mt_rand(-8, 8) / 10000.0);
+            $trendStep = $trend['direction'] * $trend['volatility'] * 0.4;
+
+            // 4. Elastic Mean Reversion around base price (soft band 0.85x to 1.18x)
             $ratio = $currentPrice / $base;
             $meanRevertPull = 0.0;
             if ($ratio > 1.15) {
-                $meanRevertPull = -0.0018; // Pull down from peak
+                $meanRevertPull = -0.0008; // Gentle pullback from high resistance
             } elseif ($ratio < 0.85) {
-                $meanRevertPull = 0.0018;  // Pull up from bottom
+                $meanRevertPull = 0.0008;  // Gentle bounce from support
             }
 
-            $factor = $trendStep + $noise + $meanRevertPull;
+            $factor = $trendStep + $noise + $macroWave + $swingWave + $microWave + $meanRevertPull;
+            // Cap delta per tick to maximum +/- 0.35% to prevent erratic huge bars
+            $factor = max(-0.0035, min(0.0035, $factor));
+
             $newPrice = round($currentPrice * (1.0 + $factor), 2);
 
             // Boundary safety: 0.70x to 1.30x of base price
@@ -159,12 +167,12 @@ class InvestMarketEngine
             $open = $state['stats'][$sym]['open'] ?? $base;
             $state['stats'][$sym]['high'] = max($state['stats'][$sym]['high'] ?? $newPrice, $newPrice);
             $state['stats'][$sym]['low'] = min($state['stats'][$sym]['low'] ?? $newPrice, $newPrice);
-            $state['stats'][$sym]['volume'] += round(mt_rand(500, 2500), 2);
+            $state['stats'][$sym]['volume'] += round(mt_rand(200, 1200), 2);
             $state['stats'][$sym]['change'] = round($newPrice - $open, 2);
             $state['stats'][$sym]['change_pct'] = round((($newPrice - $open) / $open) * 100, 2);
         }
 
-        // Update candlestick bars
+        // Update candlestick bars with realistic shadows
         $state = self::appendCandleTick($state, $currentTime);
 
         Cache::put('invest_market_state', $state, now()->addDays(7));
@@ -177,7 +185,7 @@ class InvestMarketEngine
     }
 
     /**
-     * Append new candle tick.
+     * Append new candle tick with organic OHLC wicks and volume.
      */
     protected static function appendCandleTick(array $state, int $time): array
     {
@@ -196,21 +204,22 @@ class InvestMarketEngine
                 $lastCandle['high'] = max($lastCandle['high'], $price);
                 $lastCandle['low'] = min($lastCandle['low'], $price);
                 $lastCandle['close'] = $price;
-                $lastCandle['volume'] += rand(10, 50);
+                $lastCandle['volume'] += rand(10, 45);
                 $state['candles_1m'][$sym][$count - 1] = $lastCandle;
             } else {
-                // New candle
+                // New 1-minute candle
                 $open = $lastCandle ? $lastCandle['close'] : $price;
+                $wickBuffer = $open * (mt_rand(4, 15) / 10000.0);
                 $newCandle = [
                     'time' => $bucket,
                     'open' => $open,
-                    'high' => max($open, $price),
-                    'low' => min($open, $price),
+                    'high' => round(max($open, $price) + $wickBuffer, 2),
+                    'low' => round(min($open, $price) - $wickBuffer, 2),
                     'close' => $price,
-                    'volume' => rand(50, 200)
+                    'volume' => rand(150, 600)
                 ];
                 $state['candles_1m'][$sym][] = $newCandle;
-                if (count($state['candles_1m'][$sym]) > 200) {
+                if (count($state['candles_1m'][$sym]) > 600) {
                     array_shift($state['candles_1m'][$sym]);
                 }
             }
@@ -229,21 +238,99 @@ class InvestMarketEngine
 
         foreach ($syms as $sym) {
             $raw1m = $state['candles_1m'][$sym] ?? [];
+            if (empty($raw1m)) {
+                $init = self::generateInitialCandles($state['prices'] ?? self::BASE_PRICES);
+                $raw1m = $init['1m'][$sym] ?? [];
+            }
+
             if ($timeframe === '1m') {
                 $result[$sym] = $raw1m;
+            } elseif ($timeframe === '5m') {
+                $result[$sym] = self::aggregateCandles($raw1m, 5 * 60);
+            } elseif ($timeframe === '15m') {
+                $result[$sym] = self::aggregateCandles($raw1m, 15 * 60);
+            } elseif ($timeframe === '1h') {
+                $result[$sym] = self::getOrCreateMacroCandles('1h', $sym, $state, $raw1m);
+            } elseif ($timeframe === '1d') {
+                $result[$sym] = self::getOrCreateMacroCandles('1d', $sym, $state, $raw1m);
             } else {
-                $multiplier = match ($timeframe) {
-                    '5m' => 5,
-                    '15m' => 15,
-                    '1h' => 60,
-                    '1d' => 1440,
-                    default => 5,
-                };
-                $result[$sym] = self::aggregateCandles($raw1m, $multiplier * 60);
+                $result[$sym] = self::aggregateCandles($raw1m, 5 * 60);
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Get or generate macro timeframe candles (1H, 1D) with deep historical depth.
+     */
+    protected static function getOrCreateMacroCandles(string $tf, string $sym, array $state, array $raw1m): array
+    {
+        $basePrice = self::BASE_PRICES[$sym] ?? 1000.0;
+        $currentPrice = $state['prices'][$sym] ?? $basePrice;
+        $now = time();
+
+        $seconds = ($tf === '1d') ? 86400 : 3600;
+        $barsCount = ($tf === '1d') ? 60 : 72; // 60 days or 72 hours
+        $currentBucket = $now - ($now % $seconds);
+
+        $candles = [];
+        $price = $basePrice * 0.96;
+
+        for ($i = $barsCount; $i >= 1; $i--) {
+            $t = $currentBucket - ($i * $seconds);
+
+            // Multi-cycle harmonic wave for macro charts
+            $wavePeriod = ($tf === '1d') ? 86400 * 30 : 3600 * 24;
+            $wave = sin((2 * M_PI * $t) / $wavePeriod) * 0.04;
+            $noise = (mt_rand(-15, 15) / 10000.0) * ($tf === '1d' ? 3.0 : 1.5);
+            $meanRevert = ($basePrice - $price) / $basePrice * 0.005;
+
+            $delta = $wave * 0.02 + $noise + $meanRevert;
+            $open = $price;
+            $close = round($open * (1.0 + $delta), 2);
+
+            $body = abs($close - $open);
+            $upperWick = round(max($body * (mt_rand(20, 50) / 100.0), $open * 0.002), 2);
+            $lowerWick = round(max($body * (mt_rand(20, 50) / 100.0), $open * 0.002), 2);
+
+            $high = round(max($open, $close) + $upperWick, 2);
+            $low = round(min($open, $close) - $lowerWick, 2);
+            $vol = round(mt_rand(10000, 80000) * ($tf === '1d' ? 10 : 1), 2);
+
+            $candles[] = [
+                'time' => $t,
+                'open' => $open,
+                'high' => $high,
+                'low' => $low,
+                'close' => $close,
+                'volume' => $vol
+            ];
+            $price = $close;
+        }
+
+        // Aggregate current active bar from live 1m candles
+        $liveAgg = self::aggregateCandles($raw1m, $seconds);
+        if (!empty($liveAgg)) {
+            $lastLive = end($liveAgg);
+            if ($lastLive['time'] === $currentBucket) {
+                $lastLive['close'] = $currentPrice;
+                $lastLive['high'] = max($lastLive['high'], $currentPrice);
+                $lastLive['low'] = min($lastLive['low'], $currentPrice);
+                $candles[] = $lastLive;
+            } else {
+                $candles[] = [
+                    'time' => $currentBucket,
+                    'open' => $price,
+                    'high' => max($price, $currentPrice),
+                    'low' => min($price, $currentPrice),
+                    'close' => $currentPrice,
+                    'volume' => rand(500, 2500)
+                ];
+            }
+        }
+
+        return $candles;
     }
 
     /**
@@ -279,7 +366,7 @@ class InvestMarketEngine
     }
 
     /**
-     * Generate synthetic historical candles on init.
+     * Generate synthetic historical candles with organic quantitative price action.
      */
     protected static function generateInitialCandles(array $prices): array
     {
@@ -289,16 +376,46 @@ class InvestMarketEngine
 
         foreach ($prices as $sym => $basePrice) {
             $list = [];
-            $price = $basePrice * 0.97;
+            // Seed starting price near current base
+            $price = $basePrice * 0.985;
+            $trendDirection = (mt_rand(1, 100) <= 50) ? 1 : -1;
+            $trendTicksLeft = mt_rand(10, 25);
 
-            for ($i = 120; $i >= 0; $i--) {
+            for ($i = 600; $i >= 0; $i--) {
                 $t = $now - ($i * 60);
-                $step = (mt_rand(1, 100) <= 65) ? (mt_rand(10, 40) / 10000.0) : -(mt_rand(5, 25) / 10000.0);
+
+                // Multi-Wave Harmonics
+                $macroWave = sin((2 * M_PI * $t) / 14400.0) * 0.025;
+                $swingWave = sin((2 * M_PI * $t) / 2700.0) * 0.015;
+                $microWave = cos((2 * M_PI * $t) / 720.0) * 0.006;
+
+                // Dynamic Trend Cycles
+                if ($trendTicksLeft <= 0) {
+                    $rnd = mt_rand(1, 100);
+                    $trendDirection = ($rnd <= 45) ? 1 : (($rnd <= 90) ? -1 : 0);
+                    $trendTicksLeft = mt_rand(10, 28);
+                }
+                $trendTicksLeft--;
+
+                $momentum = ($trendDirection * (mt_rand(6, 20) / 10000.0));
+                $noise = (mt_rand(-10, 10) / 10000.0);
+                $meanRevert = ($basePrice - $price) / $basePrice * 0.003;
+
+                $totalDelta = $momentum + $noise + $meanRevert + ($macroWave * 0.015) + ($swingWave * 0.015) + ($microWave * 0.01);
+                // Cap 1m change to 0.4% maximum
+                $totalDelta = max(-0.004, min(0.004, $totalDelta));
+
                 $open = $price;
-                $close = round($open * (1.0 + $step), 2);
-                $high = round(max($open, $close) + (mt_rand(5, 20) / 100.0), 2);
-                $low = round(min($open, $close) - (mt_rand(5, 20) / 100.0), 2);
-                $vol = rand(50, 450);
+                $close = round($open * (1.0 + $totalDelta), 2);
+
+                // Realistic wick proportions (15% to 50% of body, plus micro shadow)
+                $bodyRange = abs($close - $open);
+                $upperWick = round(max($bodyRange * (mt_rand(15, 45) / 100.0), $open * (mt_rand(5, 18) / 10000.0)), 2);
+                $lowerWick = round(max($bodyRange * (mt_rand(15, 45) / 100.0), $open * (mt_rand(5, 18) / 10000.0)), 2);
+
+                $high = round(max($open, $close) + $upperWick, 2);
+                $low = round(min($open, $close) - $lowerWick, 2);
+                $vol = round(mt_rand(300, 1800) + ($bodyRange / ($open ?: 1) * 80000), 2);
 
                 $list[] = [
                     'time' => $t,
