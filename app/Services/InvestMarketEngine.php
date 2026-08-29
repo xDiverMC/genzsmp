@@ -15,6 +15,14 @@ use Illuminate\Support\Facades\Log;
 class InvestMarketEngine
 {
     public const BASE_PRICES = [
+        'BTC' => 485.00,
+        'ETH' => 245.00,
+        'GLD' => 54.00,
+        'DIA' => 118.00,
+        'EMD' => 82.00,
+    ];
+
+    public const PREV_OPEN_PRICES = [
         'BTC' => 1020.00,
         'ETH' => 510.00,
         'GLD' => 105.00,
@@ -75,13 +83,17 @@ class InvestMarketEngine
         $stats = [];
 
         foreach ($prices as $sym => $price) {
+            $open = self::PREV_OPEN_PRICES[$sym] ?? ($price * 2.0);
+            $change = round($price - $open, 2);
+            $changePct = round(($change / $open) * 100, 2);
+
             $stats[$sym] = [
-                'open' => $price,
-                'high' => $price * 1.04,
-                'low' => $price * 0.96,
+                'open' => $open,
+                'high' => round($open * 1.02, 2),
+                'low' => round($price * 0.98, 2),
                 'volume' => 1250000.0,
-                'change' => 0.0,
-                'change_pct' => 0.0,
+                'change' => $change,
+                'change_pct' => $changePct,
             ];
         }
 
@@ -376,46 +388,35 @@ class InvestMarketEngine
 
         foreach ($prices as $sym => $basePrice) {
             $list = [];
-            // Seed starting price near current base
-            $price = $basePrice * 0.985;
-            $trendDirection = (mt_rand(1, 100) <= 50) ? 1 : -1;
-            $trendTicksLeft = mt_rand(10, 25);
+            $openPrice = self::PREV_OPEN_PRICES[$sym] ?? ($basePrice * 2.0);
+            $startPrice = $openPrice * 1.01;
+            $price = $startPrice;
 
             for ($i = 600; $i >= 0; $i--) {
                 $t = $now - ($i * 60);
+                $progress = (600 - $i) / 600.0;
 
-                // Multi-Wave Harmonics
-                $macroWave = sin((2 * M_PI * $t) / 14400.0) * 0.025;
-                $swingWave = sin((2 * M_PI * $t) / 2700.0) * 0.015;
-                $microWave = cos((2 * M_PI * $t) / 720.0) * 0.006;
+                // Smooth S-curve transition from openPrice to current basePrice
+                $targetAtStep = $startPrice + ($basePrice - $startPrice) * (sin(($progress * M_PI) - (M_PI / 2.0)) + 1.0) / 2.0;
 
-                // Dynamic Trend Cycles
-                if ($trendTicksLeft <= 0) {
-                    $rnd = mt_rand(1, 100);
-                    $trendDirection = ($rnd <= 45) ? 1 : (($rnd <= 90) ? -1 : 0);
-                    $trendTicksLeft = mt_rand(10, 28);
-                }
-                $trendTicksLeft--;
+                $wave = sin((2 * M_PI * $t) / 1800.0) * 0.003;
+                $noise = (mt_rand(-6, 6) / 10000.0);
 
-                $momentum = ($trendDirection * (mt_rand(6, 20) / 10000.0));
-                $noise = (mt_rand(-10, 10) / 10000.0);
-                $meanRevert = ($basePrice - $price) / $basePrice * 0.003;
-
-                $totalDelta = $momentum + $noise + $meanRevert + ($macroWave * 0.015) + ($swingWave * 0.015) + ($microWave * 0.01);
-                // Cap 1m change to 0.4% maximum
-                $totalDelta = max(-0.004, min(0.004, $totalDelta));
+                $pull = ($targetAtStep - $price) / ($price ?: 1) * 0.05;
+                $totalDelta = $pull + $wave + $noise;
+                $totalDelta = max(-0.0035, min(0.0035, $totalDelta));
 
                 $open = $price;
-                $close = round($open * (1.0 + $totalDelta), 2);
+                $close = ($i === 0) ? $basePrice : round($open * (1.0 + $totalDelta), 2);
 
-                // Realistic wick proportions (15% to 50% of body, plus micro shadow)
+                // Realistic wick proportions (15% to 40% of body, plus micro shadow)
                 $bodyRange = abs($close - $open);
-                $upperWick = round(max($bodyRange * (mt_rand(15, 45) / 100.0), $open * (mt_rand(5, 18) / 10000.0)), 2);
-                $lowerWick = round(max($bodyRange * (mt_rand(15, 45) / 100.0), $open * (mt_rand(5, 18) / 10000.0)), 2);
+                $upperWick = round(max($bodyRange * (mt_rand(15, 40) / 100.0), $open * (mt_rand(3, 12) / 10000.0)), 2);
+                $lowerWick = round(max($bodyRange * (mt_rand(15, 40) / 100.0), $open * (mt_rand(3, 12) / 10000.0)), 2);
 
                 $high = round(max($open, $close) + $upperWick, 2);
                 $low = round(min($open, $close) - $lowerWick, 2);
-                $vol = round(mt_rand(300, 1800) + ($bodyRange / ($open ?: 1) * 80000), 2);
+                $vol = round(mt_rand(500, 3200) + ($bodyRange / ($open ?: 1) * 120000), 2);
 
                 $list[] = [
                     'time' => $t,
