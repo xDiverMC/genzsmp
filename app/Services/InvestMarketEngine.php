@@ -143,13 +143,13 @@ class InvestMarketEngine
             $noise = (mt_rand(-8, 8) / 10000.0);
             $trendStep = $trend['direction'] * $trend['volatility'] * 0.4;
 
-            // 4. Elastic Mean Reversion around base price (soft band 0.85x to 1.18x)
+            // 4. Elastic Mean Reversion around wide macro band (0.50x to 1.25x)
             $ratio = $currentPrice / $base;
             $meanRevertPull = 0.0;
-            if ($ratio > 1.15) {
-                $meanRevertPull = -0.0008; // Gentle pullback from high resistance
-            } elseif ($ratio < 0.85) {
-                $meanRevertPull = 0.0008;  // Gentle bounce from support
+            if ($ratio > 1.25) {
+                $meanRevertPull = -0.0003; // Gentle pullback from ceiling
+            } elseif ($ratio < 0.48) {
+                $meanRevertPull = 0.0003;  // Gentle bounce from rock bottom
             }
 
             $factor = $trendStep + $noise + $macroWave + $swingWave + $microWave + $meanRevertPull;
@@ -158,8 +158,8 @@ class InvestMarketEngine
 
             $newPrice = round($currentPrice * (1.0 + $factor), 2);
 
-            // Boundary safety: 0.70x to 1.30x of base price
-            $newPrice = max($base * 0.70, min($base * 1.30, $newPrice));
+            // Boundary safety: 0.45x to 1.30x of base price (supports deep macro corrections)
+            $newPrice = max($base * 0.45, min($base * 1.30, $newPrice));
 
             $state['prices'][$sym] = $newPrice;
 
