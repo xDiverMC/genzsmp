@@ -233,7 +233,7 @@ class InvestSyncController extends Controller
         }
 
         $subtotal = $amount * $price;
-        $taxRate = 0.08;
+        $taxRate = 0.12; // 12% Protocol Trade Tax
         $tax = $subtotal * $taxRate;
         $total = ($tradeType === 'BUY') ? ($subtotal + $tax) : ($subtotal - $tax);
 
@@ -249,6 +249,9 @@ class InvestSyncController extends Controller
             $portfolio->amount = $newAmount;
             $portfolio->avg_buy_price = $newAvg;
             $portfolio->save();
+
+            // Apply dynamic upward buying price impact on the market chart
+            \App\Services\InvestMarketEngine::applyBuyPriceImpact($asset, $amount);
         }
 
         InvestTrade::create([

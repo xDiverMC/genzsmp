@@ -811,7 +811,7 @@
                   <span id="summary-subtotal" class="text-white">bash.00</span>
                 </div>
                 <div class="flex justify-between">
-                  <span id="summary-tax-label" class="text-neutral-500">Protocol Tax (8%):</span>
+                  <span id="summary-tax-label" class="text-neutral-500">Protocol Tax (12%):</span>
                   <span id="summary-tax" class="text-yellow-400">bash.00</span>
                 </div>
                 <div class="h-px bg-neutral-900 my-1"></div>

@@ -468,7 +468,7 @@ class InvestMarketEngine
                     }
                     if (!$user) return;
 
-                    $taxRate = 0.08;
+                    $taxRate = 0.12; // 12% Protocol Trade Tax
                     $subtotal = $order->amount * $spotPrice;
                     $tax = $subtotal * $taxRate;
 
@@ -548,6 +548,51 @@ class InvestMarketEngine
                 });
             }
         }
+    }
+
+    /**
+     * Apply upward buying price impact when an asset is bought,
+     * especially boosting price upwards when buying during a dip/minus.
+     */
+    public static function applyBuyPriceImpact(string $symbol, float $amount): float
+    {
+        $sym = strtoupper($symbol);
+        $state = Cache::get('invest_market_state');
+        if (!$state || !isset($state['prices'][$sym])) {
+            $state = self::initMarketState();
+        }
+
+        $base = self::BASE_PRICES[$sym] ?? 1000.0;
+        $currentPrice = $state['prices'][$sym] ?? $base;
+
+        // Base volume impact: 0.15% to 0.40%
+        $volFactor = min(0.005, ($amount / 1000.0) * 0.002);
+        $baseImpact = 0.0020 + $volFactor;
+
+        // If asset is currently at a discount / dip (price < base), increase upward buy bounce
+        if ($currentPrice < $base) {
+            $discountRatio = ($base - $currentPrice) / $base;
+            $baseImpact += ($discountRatio * 0.008); // Extra upward momentum on dip buys
+        }
+
+        $newPrice = round($currentPrice * (1.0 + $baseImpact), 2);
+        // Safety bounds
+        $newPrice = max($base * 0.45, min($base * 1.30, $newPrice));
+
+        $state['prices'][$sym] = $newPrice;
+
+        // Update stats
+        $open = $state['stats'][$sym]['open'] ?? $base;
+        $state['stats'][$sym]['high'] = max($state['stats'][$sym]['high'] ?? $newPrice, $newPrice);
+        $state['stats'][$sym]['volume'] += round($amount * $newPrice, 2);
+        $state['stats'][$sym]['change'] = round($newPrice - $open, 2);
+        $state['stats'][$sym]['change_pct'] = round((($newPrice - $open) / $open) * 100, 2);
+
+        // Update live candle
+        $state = self::appendCandleTick($state, time());
+
+        Cache::put('invest_market_state', $state, now()->addDays(7));
+        return $newPrice;
     }
 
     /**

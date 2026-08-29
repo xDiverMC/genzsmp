@@ -239,9 +239,9 @@ class TradingApiController extends Controller
             ], 429);
         }
 
-        // 5. Calculate Financials (8% All Assets)
+        // 5. Calculate Financials (12% All Assets)
         $subtotal = $amount * $spotPrice;
-        $taxRate = 0.08;
+        $taxRate = 0.12;
         $tax = $subtotal * $taxRate;
 
         $tradeSuccess = false;
@@ -256,7 +256,7 @@ class TradingApiController extends Controller
                     $lockedUser = InvestUser::where('id', $user->id)->lockForUpdate()->first();
                     if (!$lockedUser || $lockedUser->cash_balance < $totalCost) {
                         $curr = $lockedUser ? (float) $lockedUser->cash_balance : 0;
-                        throw new \Exception("Saldo kas Vault tidak mencukupi! Anda membutuhkan $" . number_format($totalCost, 2) . " (termasuk pajak 8%), namun saldo Anda hanya $" . number_format($curr, 2));
+                        throw new \Exception("Saldo kas Vault tidak mencukupi! Anda membutuhkan $" . number_format($totalCost, 2) . " (termasuk pajak 12%), namun saldo Anda hanya $" . number_format($curr, 2));
                     }
 
                     $lockedUser->cash_balance -= $totalCost;
@@ -328,9 +328,12 @@ class TradingApiController extends Controller
                     ];
                 });
 
+                // Apply dynamic upward buying price impact on the market chart
+                \App\Services\InvestMarketEngine::applyBuyPriceImpact($assetSymbol, $amount);
+
                 return response()->json([
                     'success' => true,
-                    'message' => "Order BUY Berhasil! Anda membeli {$amount} {$assetSymbol} senilai $" . number_format($totalCost, 2) . " (Pajak: $" . number_format($tax, 2) . ")",
+                    'message' => "Order BUY Berhasil! Anda membeli {$amount} {$assetSymbol} senilai $" . number_format($totalCost, 2) . " (Pajak 12%: $" . number_format($tax, 2) . ")",
                     'data' => $tradeResult
                 ]);
 
@@ -456,7 +459,7 @@ class TradingApiController extends Controller
             return response()->json(['success' => false, 'message' => 'PIN Keamanan Trading salah.'], 401);
         }
 
-        $taxRate = 0.08;
+        $taxRate = 0.12;
         $subtotal = $amount * $targetPrice;
         $tax = $subtotal * $taxRate;
         $reservedCost = $subtotal + $tax;
@@ -470,7 +473,7 @@ class TradingApiController extends Controller
             if ($user->cash_balance < $reservedCost) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Saldo kas Vault tidak cukup untuk Limit Buy! Dibutuhkan: $" . number_format($reservedCost, 2) . " (termasuk pajak {$taxRate}*100%)."
+                    'message' => "Saldo kas Vault tidak cukup untuk Limit Buy! Dibutuhkan: $" . number_format($reservedCost, 2) . " (termasuk pajak 12%)."
                 ], 400);
             }
 

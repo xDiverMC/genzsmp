@@ -23,11 +23,11 @@ const state = {
   cooldownRemaining: 0,
   pendingTrade: null,
   assets: {
-    btc: { symbol: 'BTC', name: 'Bitcoin', category: 'Crypto', price: 1020.00, openPrice: 1020.00, high: 1080.00, low: 950.00, volume: 124500, tax_percent: 8.0, changePercent: 0.00 },
-    eth: { symbol: 'ETH', name: 'Ethereum', category: 'Crypto', price: 510.00, openPrice: 510.00, high: 540.00, low: 480.00, volume: 62100, tax_percent: 8.0, changePercent: 0.00 },
-    gld: { symbol: 'GLD', name: 'Gold Ingot', category: 'Commodity', price: 105.00, openPrice: 105.00, high: 110.00, low: 98.00, volume: 18400, tax_percent: 8.0, changePercent: 0.00 },
-    dia: { symbol: 'DIA', name: 'Diamond Gem', category: 'Commodity', price: 245.00, openPrice: 245.00, high: 260.00, low: 240.00, volume: 34200, tax_percent: 8.0, changePercent: 0.00 },
-    emd: { symbol: 'EMD', name: 'Emerald Shard', category: 'Commodity', price: 175.00, openPrice: 175.00, high: 190.00, low: 160.00, volume: 28900, tax_percent: 8.0, changePercent: 0.00 }
+    btc: { symbol: 'BTC', name: 'Bitcoin', category: 'Crypto', price: 1020.00, openPrice: 1020.00, high: 1080.00, low: 950.00, volume: 124500, tax_percent: 12.0, changePercent: 0.00 },
+    eth: { symbol: 'ETH', name: 'Ethereum', category: 'Crypto', price: 510.00, openPrice: 510.00, high: 540.00, low: 480.00, volume: 62100, tax_percent: 12.0, changePercent: 0.00 },
+    gld: { symbol: 'GLD', name: 'Gold Ingot', category: 'Commodity', price: 105.00, openPrice: 105.00, high: 110.00, low: 98.00, volume: 18400, tax_percent: 12.0, changePercent: 0.00 },
+    dia: { symbol: 'DIA', name: 'Diamond Gem', category: 'Commodity', price: 245.00, openPrice: 245.00, high: 260.00, low: 240.00, volume: 34200, tax_percent: 12.0, changePercent: 0.00 },
+    emd: { symbol: 'EMD', name: 'Emerald Shard', category: 'Commodity', price: 175.00, openPrice: 175.00, high: 190.00, low: 160.00, volume: 28900, tax_percent: 12.0, changePercent: 0.00 }
   },
   portfolio: {
     btc: { amount: 0, avgBuyPrice: 0 },
